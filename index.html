@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAZ — Me gusta el pollo frito, me gustas tú.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="header">
+  <!-- REEMPLAZAR ESTE TEXTO POR EL LOGO REAL CUANDO TRABAJEMOS LOS ASSETS -->
+  <a class="logo" href="/"> <img src="img/logo.svg" alt="TAZ"></a>
+  <button class="menu" id="menu">☰</button>
+  <nav class="nav" id="nav">
+    <a href="#inicio">Inicio</a><a href="#nosotros">Nosotros</a><a href="#especialidades">Menú</a><a href="#sucursales">Sucursales</a><a href="#contacto">Contacto</a>
+    <a class="order" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener">🛵 Pedir ahora</a>
+  </nav>
+</header>
+
+<main>
+<section class="hero brick" id="inicio">
+  <div class="hero-img"></div>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <span class="red">TAZ · JUJUY</span>
+      <h1 class="title-inicio">ME GUSTA EL<br><span>POLLO FRITO,</span><br>ME GUSTAS TÚ.</h1>
+      <p class="desc">Pollo frito, alitas, nuggets con bastones de queso, bucket, sándwiches de pollo y CH-POP.</p>
+      <div class="buttons"><a class="btn redbtn" href="#especialidades">Ver especialidades →</a><a class="btn outline" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener">🛵 Pedir por PedidosYa ↗</a></div>
+      <div class="hours"><span class="open">● ABIERTO TODOS LOS DÍAS</span><span>19:30 — 23:30</span></div>
+      <div class="store-status status-closed" id="storeStatus" aria-live="polite">
+        <span class="status-dot">●</span>
+        <span id="storeStatusText">Cerrado</span>
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-label="Imagen promocional de TAZ">
+      <img src="img/pollo.webp" alt="Pollo frito TAZ">
+    </div>
+  </div>
+</section>
+
+<div class="ticker"><span>Pollo frito</span><b>✦</b><span>Alitas</span><b>✦</b><span>Nuggets & CO</span><b>✦</b><span>CH-POP</span><b>✦</b><span>Sándwiches</span><b>✦</b><span>Lomitos</span></div>
+
+<section class="section brick" id="nosotros">
+  <div class="about"><div class="years">24<small>AÑOS</small></div><div class="about-copy">
+    <span class="red">Nuestra historia</span><h2 class="h2">24 AÑOS<br>COMPARTIENDO<br><span>BUENOS MOMENTOS.</span></h2>
+    <p>Hace 24 años TAZ empezó a formar parte de las noches jujeñas. Una propuesta familiar, cercana y con una especialidad que nos identifica: el pollo frito.</p>
+    <p>Seguimos creciendo junto a nuestra gente, manteniendo la idea de siempre: comida rica, abundante y momentos para compartir.</p>
+  </div></div>
+</section>
+
+<section class="section" id="especialidades">
+  <div class="title"><span class="red">Lo que nos hace TAZ</span><h2>NUESTRAS<br><span>ESPECIALIDADES</span></h2></div>
+  <div class="food-grid">
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">01</span><h3>Pollo frito</h3><p>Crujiente por fuera, jugoso por dentro.</p></div></article>
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">02</span><h3>Alitas</h3><p>El sabor que te hace volver.</p></div></article>
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">03</span><h3>SPF (Sandwich de pollo)</h3><p>Pochoclitos de pollo trozado, ideales para acompañar.</p></div></article>
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">04</span><h3>Nuggets & CO</h3><p>Nuggets de pollo con bastones de queso.</p></div></article>
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">05</span><h3>Balde de pollo frito</h3><p>Mix de las especialidades de la casa, perfecto para compartir.</p></div></article>
+    <article class="card"><div class="photo">ESPACIO PARA FOTO</div><div class="info"><span class="num">06</span><h3>CH-POP</h3><p>Pochoclitos de pollo trozado, ideales para acompañar.</p></div></article>
+  </div>
+  <div class="menu-cta-wrap">
+    <a class="btn redbtn menu-cta" href="menu.html">Ver menú completo →</a>
+  </div>
+
+</section>
+
+<section class="quote"><small>La esencia de TAZ</small><p>ME GUSTA EL POLLO FRITO,<br style="margin-bottom: 20px;"><span>ME GUSTAS TÚ.</span></p><small>TAZ · JUJUY</small></section>
+
+<section class="section" id="sucursales">
+  <div class="title"><span class="red">Encontranos</span><h2>NUESTRAS<br><span>SUCURSALES</span></h2></div>
+  <div class="branch-grid">
+    <article class="branch">
+      <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Centro TAZ"></div>
+      <span class="num">01</span>
+      <h3>Centro</h3>
+      <p class="address">Alvear 1346</p>
+      <a class="phone" href="tel:+543884798839">📞 388 479-8839</a>
+      <a class="map" href="https://www.google.com/maps/search/?api=1&query=Alvear+1346,+San+Salvador+de+Jujuy" target="_blank" rel="noopener">Ver ubicación ↗</a>
+    </article>
+
+    <article class="branch">
+      <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Ciudad de Nieva TAZ"></div>
+      <span class="num">02</span>
+      <h3>Ciudad de Nieva</h3>
+      <p class="address">Avenida Carrillo 574</p>
+      <a class="phone" href="tel:+543885930629">📞 388 593-0629</a>
+      <a class="map" href="https://maps.app.goo.gl/kTRWSae9ZjYC2mVv5" target="_blank" rel="noopener">Ver ubicación ↗</a>
+    </article>
+
+    <article class="branch">
+      <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Alto Comedero TAZ"></div>
+      <span class="num">04</span>
+      <h3>Alto Comedero</h3>
+      <p class="address">Fuerza Aérea 286</p>
+      <a class="phone" href="tel:+543883427093">📞 388 342-7093</a>
+      <a class="map" href="https://www.google.com/maps/search/?api=1&query=Fuerza+Aerea+286,+San+Salvador+de+Jujuy" target="_blank" rel="noopener">Ver ubicación ↗</a>
+    </article>
+  </div>
+  <div class="hoursbar"><span class="dot">●</span><div><strong>ABIERTO TODOS LOS DÍAS</strong><span>Lunes a domingo · 19:30 — 23:30</span></div></div>
+</section>
+
+<section class="delivery">
+  <div><span class="red">Delivery</span><h2>¿TENÉS HAMBRE?<br><span>PEDÍ TAZ.</span></h2><p>Pedí tus favoritos de TAZ a través de PedidosYa. Tocá el botón y continuá tu pedido desde la plataforma.</p>
+    <a class="btn redbtn" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener" style="margin-top:28px">🛵 PEDIR POR PEDIDOSYA ↗</a>
+    <small class="note">Más adelante podemos sustituir este enlace por el enlace directo a la ficha de TAZ.</small>
+  </div>
+  <div class="placeholder"><img src="img/pedidosya-seeklogo.svg" alt="PedidosYa"></div>
+</section>
+
+<section class="section contact" id="contacto">
+  <div><span class="red">Hablemos</span><h2>NO TE QUEDES<br><span>CON LAS GANAS.</span></h2><div class="contact-links"><a href="https://wa.me/543884798839" target="_blank" rel="noopener">💬 WhatsApp · 388 479-8839 ↗</a><a href="tel:+543883427093">📞 Solo llamadas · 388 342-7093</a></div></div>
+  <div class="instagram"><span class="red">Seguinos</span><h3>@taz_jujuy</h3><a href="https://www.instagram.com/taz_jujuy/" target="_blank" rel="noopener">Ver Instagram ↗</a></div>
+</section>
+</main>
+
+<footer><div class="flogo"><a class="logo" href="/"> <img src="img/logo.svg" alt="TAZ"></a></div><p>Me gusta el pollo frito, me gustas tú.</p><nav class="fnav"><a href="#inicio">Inicio</a><a href="#nosotros">Nosotros</a><a href="#especialidades">Especialidades</a><a href="#sucursales">Sucursales</a><a href="#contacto">Contacto</a></nav><small>© TAZ Jujuy</small></footer>
+
+<script src="script.js"></script>
+</body>
+</html>
