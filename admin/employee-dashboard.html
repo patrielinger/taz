@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TAZ Admin · Empleados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-dashboard-page">
+  <aside class="sidebar">
+    <div class="brand-block">
+      <span class="eyebrow">TAZ</span>
+      <h2>ADMIN</h2>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-link active" data-section="dashboard">Inicio</button>
+      <button class="nav-link" data-section="employees">Empleados</button>
+    </nav>
+  </aside>
+
+  <div class="dashboard-content">
+    <header class="admin-header">
+      <div class="admin-header-inner">
+        <div>
+          <span class="eyebrow">TAZ · PANEL</span>
+          <h1>Dashboard del administrador</h1>
+        </div>
+        <button id="logoutBtn" type="button" class="secondary-btn">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="admin-shell dashboard-shell">
+      <section id="dashboard" class="admin-section active-section">
+        <section class="panel intake-panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">Carga diaria</span>
+              <h2>Registrar ingresos</h2>
+            </div>
+          </div>
+
+          <form id="incomeForm" class="admin-form">
+            <div class="field-row two-cols">
+              <div class="field-group">
+                <label for="datePickerToggle">Fecha</label>
+                <button type="button" id="datePickerToggle" class="secondary-btn date-toggle">Seleccionar fecha</button>
+                <input type="date" id="incomeDate" class="hidden" required>
+              </div>
+
+              <div class="field-group">
+                <label for="branchSelect">Sucursal</label>
+                <select id="branchSelect" required>
+                  <option value="Centro">Centro</option>
+                  <option value="Ciudad de Nieva">Ciudad de Nieva</option>
+                  <option value="Alto Comedero">Alto Comedero</option>
+                  <option value="Hattogu">Hattogu</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-row three-cols">
+              <div class="field-group">
+                <label for="cashInput">Efectivo</label>
+                <input type="text" id="cashInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
+
+              <div class="field-group">
+                <label for="transferInput">Transferencias</label>
+                <input type="text" id="transferInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
+
+              <div class="field-group">
+                <label for="qrInput">QR</label>
+                <input type="text" id="qrInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="notesInput">Notas del día</label>
+              <textarea id="notesInput" rows="4" placeholder="Ej: Cierre tarde, promociones, ajustes..."></textarea>
+            </div>
+
+            <button type="submit" class="primary-btn submit-btn">Subir</button>
+          </form>
+        </section>
+
+        <section class="stats-grid">
+          <article class="stat-card panel">
+            <span>Total del día</span>
+            <strong id="dayTotal">$0</strong>
+          </article>
+          <article class="stat-card panel">
+            <span>Ingresos del mes</span>
+            <strong id="monthTotal">$0</strong>
+          </article>
+          <article class="stat-card panel">
+            <span>Promedio por sucursal</span>
+            <strong id="branchAverage">$0</strong>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head between">
+            <div>
+              <span class="eyebrow">Resumen por sucursal</span>
+              <h2>Totales por local</h2>
+            </div>
+            <div class="mini-filter">
+              <label for="dayFilter">Filtrar día</label>
+              <input type="date" id="dayFilter">
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sucursal</th>
+                  <th>Efectivo</th>
+                  <th>Transferencias</th>
+                  <th>QR</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="branchSummaryTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel chart-panel">
+          <div class="panel-head between">
+            <div>
+              <span class="eyebrow">Estadísticas</span>
+              <h2>Ingresos por rango</h2>
+            </div>
+            <div class="range-controls">
+              <label>
+                <span>Desde</span>
+                <input type="date" id="chartStart">
+              </label>
+              <label>
+                <span>Hasta</span>
+                <input type="date" id="chartEnd">
+              </label>
+            </div>
+          </div>
+
+          <canvas id="incomeChart" width="900" height="280"></canvas>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">Registros</span>
+              <h2>Historial por día</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sucursal</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Usuario</th>
+                  <th>Efectivo</th>
+                  <th>Transferencias</th>
+                  <th>QR</th>
+                  <th>Total</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody id="dailyRecordsTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="employees" class="admin-section">
+        <div class="panel employee-panel">
+          <div class="panel-head between">
+            <div>
+              <span class="eyebrow">Personal</span>
+              <h2 id="employeeFormTitle">Agregar empleado</h2>
+            </div>
+          </div>
+
+          <form id="employeeForm" class="admin-form employee-form">
+            <input type="hidden" id="employeeId">
+
+            <div class="field-row two-cols">
+              <div class="field-group">
+                <label for="employeeName">Nombre</label>
+                <input type="text" id="employeeName" required>
+              </div>
+
+              <div class="field-group">
+                <label for="employeeLastName">Apellido</label>
+                <input type="text" id="employeeLastName" required>
+              </div>
+            </div>
+
+            <div class="field-row two-cols">
+              <div class="field-group">
+                <label for="employeeRole">Rol</label>
+                <select id="employeeRole" required>
+                  <option value="Empleado">Empleado</option>
+                  <option value="Encargado">Encargado</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label for="employeeHourlyRate">Cobro por hora</label>
+                <input type="number" id="employeeHourlyRate" min="0" step="0.01" required>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="employeePhone">Número de contacto</label>
+              <input type="tel" id="employeePhone" required>
+            </div>
+
+            <div class="field-group employee-notes-field hidden">
+              <label for="employeeNotes">Notas del empleado</label>
+              <textarea id="employeeNotes" rows="4" placeholder="Escribí comentarios, observaciones o tareas del empleado..."></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="primary-btn">Guardar empleado</button>
+              <button type="button" id="resetEmployeeForm" class="secondary-btn">Cancelar</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel employee-list-panel">
+          <div class="panel-head between">
+            <div>
+              <span class="eyebrow">Listado</span>
+              <h2>Empleados registrados</h2>
+            </div>
+          </div>
+
+          <div id="employeeList" class="employee-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

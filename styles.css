@@ -218,6 +218,19 @@ a {
   transform: translateY(-2px);
 }
 
+.pedidosya-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pedidosya-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  object-fit: contain;
+}
+
 .redbtn {
   background: var(--r);
 }
@@ -522,7 +535,8 @@ a {
 }
 
 .photo {
-  height: 270px;
+  aspect-ratio: 1 / 1;
+  width: 100%;
   background: #121212;
   border-bottom: 1px solid var(--l);
   display: grid;
@@ -530,6 +544,15 @@ a {
   color: rgba(255, 255, 255, 0.1);
   font-weight: 800;
   letter-spacing: 0.15em;
+  overflow: hidden;
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .info {
@@ -574,6 +597,15 @@ a {
 .quote small {
   font-weight: 800;
   letter-spacing: 0.2em;
+}
+
+.quote-break {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.delivery-cta {
+  margin-top: 28px;
 }
 
 .branch-grid {

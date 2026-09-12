@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TAZ Admin · Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-login-page">
+  <main class="admin-shell login-shell">
+    <div class="login-card panel">
+      <div class="login-branding">
+        <span class="eyebrow">TAZ · ADMINISTRACIÓN</span>
+        <h1>Acceso restringido</h1>
+      </div>
+
+      <form id="loginForm" class="admin-form" autocomplete="off">
+        <label>
+          <span>Usuario</span>
+          <input type="text" id="username" name="username" placeholder="admin" required>
+        </label>
+
+        <label>
+          <span>Contraseña</span>
+          <input type="password" id="password" name="password" placeholder="••••••••" required>
+        </label>
+
+        <button type="submit" class="primary-btn">Ingresar</button>
+      </form>
+
+      <p id="loginMessage" class="form-message" aria-live="polite"></p>
+    </div>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
