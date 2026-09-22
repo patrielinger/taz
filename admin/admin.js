@@ -3,6 +3,21 @@ const STORAGE_KEY = 'taz_admin_records';
 const EMPLOYEES_KEY = 'taz_employees';
 const ADMIN_USERS = [{ username: 'admin', password: 'tazadmin123', name: 'Administrador' }];
 const BRANCHES = ['Centro', 'Ciudad de Nieva', 'Alto Comedero', 'Hattogu'];
+const ANALYTICS_OPTIONS = ['Negocio', ...BRANCHES];
+
+function normalizeBranchName(branch) {
+  const value = String(branch || '').trim();
+  if (!value) return 'Centro';
+  const map = {
+    Nieva: 'Ciudad de Nieva',
+    'Ciudad de Nieva': 'Ciudad de Nieva',
+    Hattogu: 'Hattogu',
+    'Jatobú': 'Hattogu',
+    Centro: 'Centro',
+    'Alto Comedero': 'Alto Comedero'
+  };
+  return map[value] || value;
+}
 
 function ensureDemoData() {
   const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -79,8 +94,24 @@ function normalizeEmployee(row) {
     hourlyRate: Number(row.hourly_rate ?? row.hourlyRate ?? 0),
     phone: row.phone || '',
     branch: row.branch || 'Centro',
-    notes: row.notes || ''
+    notes: row.notes || '',
+    password: row.password || ''
   };
+}
+
+async function syncSessionFromServer() {
+  try {
+    const data = await fetchJson('/api/session');
+    if (data && data.user) {
+      const sessionValue = data.user.role === 'Encargado' ? `encargado:${data.user.username}` : data.user.username;
+      sessionStorage.setItem(SESSION_KEY, sessionValue);
+      return data.user;
+    }
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function sanitizeNumber(value) {
@@ -98,6 +129,7 @@ function money(value) {
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options
   });
 
@@ -111,17 +143,34 @@ async function fetchJson(url, options = {}) {
   return data;
 }
 
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function setDefaultDate() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const todayStr = formatDateInput(today);
+
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 30);
+  const startDateStr = formatDateInput(startDate);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const tomorrowStr = formatDateInput(tomorrow);
+
   const dateInput = document.getElementById('incomeDate');
   const dayFilter = document.getElementById('dayFilter');
   const chartStart = document.getElementById('chartStart');
   const chartEnd = document.getElementById('chartEnd');
 
-  if (dateInput) dateInput.value = today;
-  if (dayFilter) dayFilter.value = today;
-  if (chartStart) chartStart.value = today;
-  if (chartEnd) chartEnd.value = today;
+  if (dateInput) dateInput.value = todayStr;
+  if (dayFilter) dayFilter.value = todayStr;
+  if (chartStart) chartStart.value = startDateStr;
+  if (chartEnd) chartEnd.value = tomorrowStr;
 }
 
 function getSelectedDayRecords(records, date) {
@@ -137,12 +186,13 @@ function renderBranchSummary(records) {
 
   const dayRecords = getSelectedDayRecords(records, day);
   const totals = BRANCHES.map((branch) => {
-    const filtered = dayRecords.filter((record) => record.sucursal === branch);
+    const filtered = dayRecords.filter((record) => normalizeBranchName(record.sucursal) === branch);
     return {
       branch,
       efectivo: filtered.reduce((sum, item) => sum + Number(item.efectivo || 0), 0),
       transferencias: filtered.reduce((sum, item) => sum + Number(item.transferencias || 0), 0),
       qr: filtered.reduce((sum, item) => sum + Number(item.qr || 0), 0),
+      pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || 0), 0),
       total: filtered.reduce((sum, item) => sum + Number(item.total || 0), 0)
     };
   });
@@ -153,6 +203,7 @@ function renderBranchSummary(records) {
       <td>${money(item.efectivo)}</td>
       <td>${money(item.transferencias)}</td>
       <td>${money(item.qr)}</td>
+      <td>${money(item.pedidosYa)}</td>
       <td>${money(item.total)}</td>
     </tr>
   `).join('');
@@ -190,9 +241,9 @@ function renderRecords(records) {
 
   if (!filteredRecords.length) {
     table.innerHTML = `
-      <tr>
-        <td colspan="9">No hay ingresos cargados para esta fecha.</td>
-      </tr>
+        <tr>
+          <td colspan="11">No hay ingresos cargados para esta fecha.</td>
+        </tr>
     `;
     return;
   }
@@ -206,13 +257,395 @@ function renderRecords(records) {
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
+      <td>${money(record.pedidosYa || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
+      <td>${record.stock || '—'}</td>
     </tr>
   `).join('');
 }
 
-function drawChart() {
+function renderLastRecord(records) {
+  const panel = document.getElementById('lastRecordPanel');
+  const content = document.getElementById('lastRecordContent');
+  if (!panel || !content) return;
+
+  // Find latest record by fecha+hora (or use timestamp if available)
+  let latest = null;
+  let latestTs = 0;
+  records.forEach((r) => {
+    let ts = 0;
+    if (r.created_at) {
+      ts = Date.parse(r.created_at);
+    } else if (r.fecha && r.hora) {
+      ts = Date.parse(`${r.fecha}T${r.hora}`);
+    } else if (r.fecha) {
+      ts = Date.parse(r.fecha);
+    }
+    if (ts && ts > latestTs) { latestTs = ts; latest = r; }
+  });
+
+  if (!latest) { panel.style.display = 'none'; return; }
+
+  const now = Date.now();
+  if (latestTs < now - 24 * 60 * 60 * 1000) { panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  content.innerHTML = `
+    <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${latest.fecha} ${latest.hora}</div>
+    <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)}</div>
+    <div>Total: ${money(latest.total)}</div>
+    <div>Notas: ${latest.notas || '—'}</div>
+    <div>Stock: ${latest.stock || '—'}</div>
+  `;
+}
+
+function setupModal() {
+  let modal = document.getElementById('appModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'appModal';
+    modal.className = 'app-modal hidden';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
+        <div class="modal-header">
+          <h3 id="appModalTitle">Mensaje</h3>
+          <button type="button" class="modal-close" data-modal-close="true" aria-label="Cerrar">×</button>
+        </div>
+        <div class="modal-body" id="appModalBody"></div>
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" data-modal-action="cancel">Cancelar</button>
+          <button type="button" class="primary-btn" data-modal-action="confirm">Aceptar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const closeBtn = modal.querySelector('[data-modal-close="true"]');
+  const cancelBtn = modal.querySelector('[data-modal-action="cancel"]');
+  const confirmBtn = modal.querySelector('[data-modal-action="confirm"]');
+
+  const hide = () => {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.dataset.mode = 'info';
+    modal.querySelector('#appModalBody').innerHTML = '';
+    modal.querySelector('#appModalTitle').textContent = 'Mensaje';
+    cancelBtn.style.display = 'inline-flex';
+    confirmBtn.textContent = 'Aceptar';
+    confirmBtn.onclick = null;
+    cancelBtn.onclick = null;
+    closeBtn.onclick = null;
+    modal.onclick = null;
+  };
+
+  const show = ({ title, body, onConfirm, onCancel, confirmText = 'Aceptar', cancelText = 'Cancelar', showCancel = true, allowBackdropClose = true }) => {
+    const titleEl = modal.querySelector('#appModalTitle');
+    const bodyEl = modal.querySelector('#appModalBody');
+    titleEl.textContent = title || 'Mensaje';
+    bodyEl.innerHTML = body || '';
+
+    cancelBtn.textContent = cancelText;
+    cancelBtn.style.display = showCancel ? 'inline-flex' : 'none';
+    confirmBtn.textContent = confirmText;
+
+    cancelBtn.onclick = () => {
+      hide();
+      if (onCancel) onCancel();
+    };
+
+    confirmBtn.onclick = () => {
+      hide();
+      if (onConfirm) onConfirm();
+    };
+
+    closeBtn.onclick = () => {
+      hide();
+      if (onCancel) onCancel();
+    };
+
+    if (allowBackdropClose) {
+      modal.onclick = (event) => {
+        if (event.target === modal) {
+          hide();
+          if (onCancel) onCancel();
+        }
+      };
+    } else {
+      modal.onclick = null;
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+  };
+
+  hide();
+  return { show, hide };
+}
+
+function showNotice(title, message, type = 'info') {
+  const modal = setupModal();
+  if (!modal) return;
+
+  const body = `<p>${message}</p>`;
+  modal.show({
+    title,
+    body,
+    confirmText: 'Aceptar',
+    cancelText: 'Cancelar',
+    showCancel: false,
+    onConfirm: null,
+    onCancel: null,
+    allowBackdropClose: true
+  });
+
+  const card = document.querySelector('#appModal .modal-card');
+  if (card) {
+    card.style.borderColor = type === 'error' ? 'rgba(242, 13, 22, 0.7)' : type === 'success' ? 'rgba(123, 247, 169, 0.7)' : 'rgba(255, 255, 255, 0.1)';
+  }
+}
+
+function openRecordEditor(record, onSave) {
+  const modal = setupModal();
+  if (!modal) return;
+
+  const body = `
+    <form id="recordEditForm" class="modal-form admin-form">
+      <div class="field-row two-cols">
+        <div class="field-group">
+          <label for="editRecordDate">Fecha</label>
+          <input id="editRecordDate" type="date" value="${record.fecha || ''}" required>
+        </div>
+        <div class="field-group">
+          <label for="editRecordBranch">Sucursal</label>
+          <select id="editRecordBranch">
+            ${BRANCHES.map((branch) => `<option value="${branch}" ${branch === record.sucursal ? 'selected' : ''}>${branch}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field-row payment-grid">
+        <div class="field-group">
+          <label for="editRecordCash">Efectivo</label>
+          <input id="editRecordCash" type="text" inputmode="numeric" value="${Number(record.efectivo || 0)}">
+        </div>
+        <div class="field-group">
+          <label for="editRecordTransfer">Transferencias</label>
+          <input id="editRecordTransfer" type="text" inputmode="numeric" value="${Number(record.transferencias || 0)}">
+        </div>
+        <div class="field-group">
+          <label for="editRecordQr">QR</label>
+          <input id="editRecordQr" type="text" inputmode="numeric" value="${Number(record.qr || 0)}">
+        </div>
+        <div class="field-group">
+          <label for="editRecordPedidosYa">PedidosYa</label>
+          <input id="editRecordPedidosYa" type="text" inputmode="numeric" value="${Number(record.pedidosYa ?? record.pedidos_ya ?? 0)}">
+        </div>
+      </div>
+      <div class="field-row notes-stock-grid">
+        <div class="field-group">
+          <label for="editRecordNotes">Notas</label>
+          <textarea id="editRecordNotes" rows="4">${(record.notas || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+        </div>
+        <div class="field-group">
+          <label for="editRecordStock">Stock</label>
+          <textarea id="editRecordStock" rows="4">${(record.stock || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+        </div>
+      </div>
+    </form>
+  `;
+
+  modal.show({
+    title: 'Editar ingreso',
+    body,
+    confirmText: 'Guardar',
+    cancelText: 'Cancelar',
+    showCancel: true,
+    allowBackdropClose: true,
+    onConfirm: () => {
+      const form = document.getElementById('recordEditForm');
+      if (!form) return;
+      const payload = {
+        fecha: document.getElementById('editRecordDate').value,
+        sucursal: document.getElementById('editRecordBranch').value,
+        efectivo: Number(sanitizeNumber(document.getElementById('editRecordCash').value)),
+        transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
+        qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
+        pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
+        notas: document.getElementById('editRecordNotes').value.trim(),
+        stock: document.getElementById('editRecordStock').value.trim(),
+      };
+      onSave(payload);
+    }
+  });
+}
+
+async function renderRecordsByDate(date) {
+  const table = document.getElementById('recordsByDateTable');
+  if (!table) return;
+
+  const records = await loadRecords();
+  const filtered = records.filter((r) => r.fecha === date).sort((a, b) => String(a.hora).localeCompare(b.hora));
+
+  if (!filtered.length) {
+    table.innerHTML = '<tr><td colspan="11">No hay registros para la fecha seleccionada.</td></tr>';
+    return;
+  }
+
+  const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
+
+  table.innerHTML = filtered.map((record) => `
+    <tr data-id="${record.id}">
+      <td>${record.hora || ''}</td>
+      <td>${record.sucursal}</td>
+      <td>${record.usuario}</td>
+      <td>${money(record.efectivo)}</td>
+      <td>${money(record.transferencias)}</td>
+      <td>${money(record.qr)}</td>
+      <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
+      <td>${money(record.total)}</td>
+      <td>${record.notas || '—'}</td>
+      <td>${record.stock || '—'}</td>
+      <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
+    </tr>
+  `).join('');
+
+  if (isAdmin) {
+    document.querySelectorAll('.edit-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const r = filtered.find((x) => String(x.id) === String(id));
+      if (!r) return;
+
+      openRecordEditor(r, async (payload) => {
+        try {
+          await fetchJson(`/api/records/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ fecha: payload.fecha || r.fecha, sucursal: payload.sucursal || r.sucursal, efectivo: payload.efectivo, transferencias: payload.transferencias, qr: payload.qr, pedidosYa: payload.pedidosYa, notas: payload.notas, stock: payload.stock })
+          });
+          await renderRecordsByDate(date);
+          await renderDashboard();
+          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+        } catch (err) {
+          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
+        }
+      });
+    }));
+
+    document.querySelectorAll('.delete-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const r = filtered.find((x) => String(x.id) === String(id));
+      if (!r) return;
+
+      setupModal().show({
+        title: 'Eliminar ingreso',
+        body: `<p>¿Eliminar el registro de ${r.sucursal} del ${r.fecha}?</p>`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        showCancel: true,
+        onConfirm: async () => {
+          try {
+            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            await renderRecordsByDate(date);
+            await renderDashboard();
+            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+          } catch (err) {
+            showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
+          }
+        }
+      });
+    }));
+  }
+}
+
+function createChartTooltip() {
+  let tooltip = document.getElementById('chart-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'chart-tooltip';
+    tooltip.className = 'chart-tooltip';
+    document.body.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+function setupChartHover(canvas, points) {
+  if (!canvas) return;
+
+  const tooltip = createChartTooltip();
+  const radius = 10;
+
+  if (!canvas.dataset.chartHoverBound) {
+    canvas.dataset.chartHoverBound = 'true';
+    canvas.addEventListener('mousemove', (event) => {
+      const list = canvas.__chartPoints || [];
+      if (!list.length) {
+        tooltip.style.opacity = '0';
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      let closest = null;
+      list.forEach((point) => {
+        const dx = mouseX - point.x;
+        const dy = mouseY - point.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= radius && (!closest || distance < closest.distance)) {
+          closest = { point, distance };
+        }
+      });
+
+      if (!closest) {
+        tooltip.style.opacity = '0';
+        return;
+      }
+
+      const { point } = closest;
+      tooltip.innerHTML = `<strong>${point.date}</strong><span>${money(point.total)}</span>`;
+      tooltip.style.left = `${event.clientX + 12}px`;
+      tooltip.style.top = `${event.clientY - 20}px`;
+      tooltip.style.opacity = '1';
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.opacity = '0';
+    });
+
+    canvas.addEventListener('click', (event) => {
+      const list = canvas.__chartPoints || [];
+      if (!list.length) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      let closest = null;
+      list.forEach((point) => {
+        const dx = mouseX - point.x;
+        const dy = mouseY - point.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= radius && (!closest || distance < closest.distance)) {
+          closest = { point, distance };
+        }
+      });
+
+      if (!closest) return;
+      const { point } = closest;
+      tooltip.innerHTML = `<strong>${point.date}</strong><span>${money(point.total)}</span>`;
+      tooltip.style.left = `${event.clientX + 12}px`;
+      tooltip.style.top = `${event.clientY - 20}px`;
+      tooltip.style.opacity = '1';
+    });
+  }
+
+  canvas.__chartPoints = points;
+  tooltip.style.opacity = '0';
+}
+
+function drawChart(records) {
   const canvas = document.getElementById('incomeChart');
   if (!canvas) return;
 
@@ -220,7 +653,7 @@ function drawChart() {
   const startDate = document.getElementById('chartStart');
   const endDate = document.getElementById('chartEnd');
 
-  const records = getStoredRecords();
+  const sourceRecords = Array.isArray(records) ? records : getStoredRecords();
   const start = startDate && startDate.value ? new Date(startDate.value + 'T00:00:00') : new Date();
   const end = endDate && endDate.value ? new Date(endDate.value + 'T00:00:00') : new Date();
 
@@ -233,7 +666,7 @@ function drawChart() {
 
   const amounts = dates.map((date) => {
     const iso = date.toISOString().slice(0, 10);
-    return records.filter((record) => record.fecha === iso).reduce((sum, record) => sum + Number(record.total || 0), 0);
+    return sourceRecords.filter((record) => record.fecha === iso).reduce((sum, record) => sum + Number(record.total || 0), 0);
   });
 
   const width = canvas.width;
@@ -266,10 +699,13 @@ function drawChart() {
     ctx.fillStyle = '#b5b5b5';
     ctx.font = '18px Barlow Condensed';
     ctx.fillText('Sin datos para el rango seleccionado', padding, height / 2);
+    setupChartHover(canvas, []);
     return;
   }
 
   const stepX = (width - padding * 2) / Math.max(amounts.length - 1, 1);
+  const points = [];
+
   ctx.beginPath();
   ctx.strokeStyle = '#f20d16';
   ctx.lineWidth = 2;
@@ -277,20 +713,21 @@ function drawChart() {
   amounts.forEach((value, index) => {
     const x = padding + index * stepX;
     const y = height - padding - (value / maxValue) * (height - padding * 2);
+    points.push({ x, y, date: dates[index].toISOString().slice(0, 10), total: value });
     if (index === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
 
   ctx.stroke();
 
-  amounts.forEach((value, index) => {
-    const x = padding + index * stepX;
-    const y = height - padding - (value / maxValue) * (height - padding * 2);
+  points.forEach((point) => {
     ctx.beginPath();
     ctx.fillStyle = '#f20d16';
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  setupChartHover(canvas, points);
 }
 
 async function loadRecords() {
@@ -299,18 +736,21 @@ async function loadRecords() {
     if (!sessionState) return getStoredRecords();
 
     const data = await fetchJson('/api/records');
-    if (Array.isArray(data) && data.length) {
+    if (Array.isArray(data)) {
       return data.map((record) => ({
         id: record.id,
         fecha: record.fecha,
-        hora: record.created_at ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false }) : '00:00:00',
+        hora: record.hora || (record.created_at ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false }) : '00:00:00'),
         usuario: record.usuario,
         sucursal: record.sucursal,
         efectivo: Number(record.efectivo || 0),
         transferencias: Number(record.transferencias || 0),
         qr: Number(record.qr || 0),
+        pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
         notas: record.notas || '',
-        total: Number(record.total || 0)
+        stock: record.stock || '',
+        total: Number(record.total || 0),
+        created_at: record.created_at || null
       }));
     }
   } catch (error) {
@@ -320,11 +760,163 @@ async function loadRecords() {
   return getStoredRecords();
 }
 
+function getRecordsForAnalytics(scope, records) {
+  if (scope === 'Negocio') return records;
+  return records.filter((record) => normalizeBranchName(record.sucursal) === scope);
+}
+
+function getActiveAnalyticsRange() {
+  const today = new Date();
+  const rangeButton = document.querySelector('.analytics-range-btn.active');
+  const fromDate = document.getElementById('analyticsFromDate');
+  const toDate = document.getElementById('analyticsToDate');
+
+  if (rangeButton) {
+    const days = Number(rangeButton.dataset.days || 7);
+    const start = new Date(today);
+    start.setDate(today.getDate() - (days - 1));
+    const end = new Date(today);
+    if (fromDate) fromDate.value = formatDateInput(start);
+    if (toDate) toDate.value = formatDateInput(end);
+    return { start, end, label: `últimos ${days} días`, days };
+  }
+
+  const startValue = fromDate && fromDate.value ? new Date(`${fromDate.value}T00:00:00`) : new Date(today);
+  const endValue = toDate && toDate.value ? new Date(`${toDate.value}T00:00:00`) : new Date(today);
+  const safeStart = startValue <= endValue ? startValue : endValue;
+  const safeEnd = startValue <= endValue ? endValue : startValue;
+
+  if (fromDate) fromDate.value = formatDateInput(safeStart);
+  if (toDate) toDate.value = formatDateInput(safeEnd);
+
+  return { start: safeStart, end: safeEnd, label: 'rango personalizado', days: Math.max(1, Math.round((safeEnd - safeStart) / 86400000) + 1) };
+}
+
+async function renderAnalytics() {
+  const analyticsScope = document.querySelector('.analytics-tab.active')?.dataset.analytics || 'Negocio';
+  const records = await loadRecords();
+  const source = getRecordsForAnalytics(analyticsScope, records);
+  const chartTitle = document.getElementById('analyticsChartTitle');
+  const tableTitle = document.getElementById('analyticsTableTitle');
+  const thirtyTotal = document.getElementById('analyticsThirtyTotal');
+  const monthTotal = document.getElementById('analyticsMonthTotal');
+  const dailyAverage = document.getElementById('analyticsDailyAverage');
+  const table = document.getElementById('analyticsRecordsTable');
+  const canvas = document.getElementById('analyticsChart');
+
+  if (!canvas || !table || !thirtyTotal || !monthTotal || !dailyAverage) return;
+
+  const today = new Date();
+  const { start, end, label } = getActiveAnalyticsRange();
+  const rangeRecords = source.filter((record) => {
+    const dateValue = new Date(`${record.fecha}T00:00:00`);
+    return dateValue >= start && dateValue <= end;
+  });
+
+  const monthRecords = source.filter((record) => record.fecha && record.fecha.startsWith(today.toISOString().slice(0, 7)));
+  const selectedRecords = [...rangeRecords].sort((a, b) => String(b.id).localeCompare(String(a.id)));
+
+  const rangeTotalValue = rangeRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const monthTotalValue = monthRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const avgValue = rangeRecords.length ? rangeTotalValue / Math.max(rangeRecords.length, 1) : 0;
+
+  chartTitle.textContent = `${analyticsScope} · ${label}`;
+  tableTitle.textContent = analyticsScope === 'Negocio' ? 'Historial general' : `Historial · ${analyticsScope}`;
+  thirtyTotal.textContent = money(rangeTotalValue);
+  monthTotal.textContent = money(monthTotalValue);
+  dailyAverage.textContent = money(avgValue);
+
+  const ctx = canvas.getContext('2d');
+  const days = [];
+  const current = new Date(start);
+  while (current <= end) {
+    days.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  const values = days.map((date) => {
+    const iso = formatDateInput(date);
+    return source.filter((record) => record.fecha === iso).reduce((sum, item) => sum + Number(item.total || 0), 0);
+  });
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 30;
+  const maxValue = Math.max(...values, 1);
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#0b0b0b';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath();
+  for (let i = 0; i <= 4; i += 1) {
+    const y = padding + ((height - padding * 2) / 4) * i;
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+  }
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, height - padding);
+  ctx.lineTo(width - padding, height - padding);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.stroke();
+
+  const chartPoints = [];
+  if (values.length) {
+    const stepX = (width - padding * 2) / Math.max(values.length - 1, 1);
+    ctx.beginPath();
+    ctx.strokeStyle = '#f20d16';
+    ctx.lineWidth = 2;
+    values.forEach((value, index) => {
+      const x = padding + index * stepX;
+      const y = height - padding - (value / maxValue) * (height - padding * 2);
+      chartPoints.push({ x, y, date: days[index].toISOString().slice(0, 10), total: value });
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    chartPoints.forEach((point) => {
+      ctx.beginPath();
+      ctx.fillStyle = '#f20d16';
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  setupChartHover(canvas, chartPoints);
+
+  if (!selectedRecords.length) {
+    table.innerHTML = '<tr><td colspan="11">No hay registros para el rango seleccionado.</td></tr>';
+    return;
+  }
+
+  table.innerHTML = selectedRecords.map((record) => `
+    <tr>
+      <td>${record.fecha}</td>
+      <td>${record.hora || '—'}</td>
+      <td>${normalizeBranchName(record.sucursal)}</td>
+      <td>${record.usuario}</td>
+      <td>${money(record.efectivo)}</td>
+      <td>${money(record.transferencias)}</td>
+      <td>${money(record.qr)}</td>
+      <td>${money(record.pedidosYa || 0)}</td>
+      <td>${money(record.total)}</td>
+      <td>${record.notas || '—'}</td>
+      <td>${record.stock || '—'}</td>
+    </tr>
+  `).join('');
+}
+
 async function renderDashboard() {
   const records = await loadRecords();
   renderBranchSummary(records);
   renderRecords(records);
-  drawChart();
+  renderLastRecord(records);
+  drawChart(records);
+  await renderAnalytics();
 }
 
 function toggleSection(sectionName) {
@@ -335,6 +927,10 @@ function toggleSection(sectionName) {
   document.querySelectorAll('.admin-section').forEach((section) => {
     section.classList.toggle('active-section', section.id === sectionName);
   });
+
+  if (sectionName === 'statistics') {
+    renderAnalytics();
+  }
 }
 
 async function getEmployees() {
@@ -411,6 +1007,8 @@ async function renderEmployees() {
       if (roleField) roleField.value = employee.role;
       if (hourlyRateField) hourlyRateField.value = employee.hourlyRate;
       if (phoneField) phoneField.value = employee.phone;
+      const passField = document.getElementById('employeePassword');
+      if (passField) passField.value = '';
       if (notesField) notesField.value = employee.notes || '';
       if (notesWrap) notesWrap.classList.remove('hidden');
       if (formTitle) formTitle.textContent = 'Editar empleado';
@@ -425,22 +1023,28 @@ async function renderEmployees() {
       const id = button.dataset.id;
       if (!id) return;
 
-      const confirmed = window.confirm('¿Quieres eliminar este empleado?');
-      if (!confirmed) return;
+      setupModal().show({
+        title: 'Eliminar empleado',
+        body: '<p>¿Quieres eliminar este empleado?</p>',
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        onConfirm: async () => {
+          try {
+            const sessionState = sessionStorage.getItem(SESSION_KEY);
+            if (sessionState) {
+              await fetchJson(`/api/employees/${id}`, { method: 'DELETE' });
+            } else {
+              const employeesBackup = getStoredEmployees().filter((employee) => String(employee.id) !== String(id));
+              saveStoredEmployees(employeesBackup);
+            }
 
-      try {
-        const sessionState = sessionStorage.getItem(SESSION_KEY);
-        if (sessionState) {
-          await fetchJson(`/api/employees/${id}`, { method: 'DELETE' });
-        } else {
-          const employeesBackup = getStoredEmployees().filter((employee) => String(employee.id) !== String(id));
-          saveStoredEmployees(employeesBackup);
+            await renderEmployees();
+            showNotice('Empleado eliminado', 'El empleado fue eliminado correctamente.', 'success');
+          } catch (error) {
+            showNotice('No se pudo eliminar', error.message || 'No se pudo eliminar el empleado.', 'error');
+          }
         }
-
-        await renderEmployees();
-      } catch (error) {
-        alert(error.message || 'No se pudo eliminar el empleado.');
-      }
+      });
     });
   });
 }
@@ -448,6 +1052,21 @@ async function renderEmployees() {
 function initEmployeeForm() {
   const form = document.getElementById('employeeForm');
   if (!form) return;
+
+  const roleFieldWatcher = document.getElementById('employeeRole');
+  const passWrap = document.querySelector('.employee-password-field');
+  if (roleFieldWatcher) {
+    const togglePasswordField = () => {
+      if (roleFieldWatcher.value === 'Encargado') {
+        passWrap?.classList.remove('hidden');
+      } else {
+        passWrap?.classList.add('hidden');
+      }
+    };
+    roleFieldWatcher.addEventListener('change', togglePasswordField);
+    // inicializar visibilidad
+    togglePasswordField();
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -464,14 +1083,36 @@ function initEmployeeForm() {
       notes: document.getElementById('employeeNotes')?.value.trim() || existingEmployee?.notes || ''
     };
 
+    // Manejar contraseña para encargados: si es nuevo o se ingresó una nueva contraseña,
+    // guardarla en el registro; si se está editando y no se ingresa contraseña, mantener la anterior.
+    const passInput = document.getElementById('employeePassword');
+    const sessionState = sessionStorage.getItem(SESSION_KEY);
+    if (payload.role === 'Encargado') {
+      const newPass = passInput?.value?.trim() || '';
+      if (sessionState) {
+        // Server mode: include password only if provided (creation is validated later)
+        if (newPass) payload.password = newPass;
+      } else {
+        // Local mode: keep previous behavior (store password locally)
+        payload.password = newPass || existingEmployee?.password || '';
+      }
+    } else {
+      payload.password = '';
+    }
+
     if (!payload.name || !payload.lastName || !payload.phone) {
-      alert('Completá nombre, apellido y contacto.');
+      showNotice('Faltan datos', 'Completá nombre, apellido y contacto.', 'error');
       return;
     }
 
     try {
       const sessionState = sessionStorage.getItem(SESSION_KEY);
       if (sessionState) {
+        // If creating a new Encargado while connected to server, require a password
+        if (payload.role === 'Encargado' && !(idField && idField.value) && (!passInput || !passInput.value.trim())) {
+          showNotice('Contraseña requerida', 'Debés asignar una contraseña al crear un Encargado.', 'error');
+          return;
+        }
         const url = idField && idField.value ? `/api/employees/${idField.value}` : '/api/employees';
         const method = idField && idField.value ? 'PUT' : 'POST';
         await fetchJson(url, {
@@ -492,9 +1133,9 @@ function initEmployeeForm() {
       form.reset();
       if (idField) idField.value = '';
       await renderEmployees();
-      alert('Empleado guardado correctamente.');
+      showNotice('Empleado guardado', 'El empleado fue guardado correctamente.', 'success');
     } catch (error) {
-      alert(error.message || 'No se pudo guardar el empleado.');
+      showNotice('No se pudo guardar', error.message || 'No se pudo guardar el empleado.', 'error');
     }
   });
 
@@ -527,10 +1168,30 @@ function initLoginPage() {
       });
 
       if (data.ok) {
-        sessionStorage.setItem(SESSION_KEY, data.user.username);
-        window.location.href = '/admin/employee-dashboard.html';
+        const user = data.user || {};
+        if (user.role === 'Encargado') {
+          sessionStorage.setItem(SESSION_KEY, `encargado:${user.username}`);
+        } else {
+          sessionStorage.setItem(SESSION_KEY, user.username || 'admin');
+        }
+        window.location.href = data.redirect || '/admin/employee-dashboard.html';
       }
     } catch (error) {
+      const adminMatch = ADMIN_USERS.find((u) => u.username === username && u.password === password);
+      if (adminMatch) {
+        sessionStorage.setItem(SESSION_KEY, adminMatch.username);
+        window.location.href = '/admin/employee-dashboard.html';
+        return;
+      }
+
+      const employees = getStoredEmployees();
+      const encargado = employees.find((e) => e.phone === username && e.password === password && e.role === 'Encargado');
+      if (encargado) {
+        sessionStorage.setItem(SESSION_KEY, `encargado:${encargado.phone}`);
+        window.location.href = '/admin/encargado.html';
+        return;
+      }
+
       if (message) {
         message.textContent = error.message || 'Usuario o contraseña incorrectos.';
       }
@@ -539,7 +1200,7 @@ function initLoginPage() {
 }
 
 async function initDashboardPage() {
-  const sessionUser = sessionStorage.getItem(SESSION_KEY);
+  const sessionUser = await syncSessionFromServer();
   if (!sessionUser) {
     window.location.href = '/admin/index.html';
     return;
@@ -558,29 +1219,28 @@ async function initDashboardPage() {
   });
 
   document.querySelectorAll('.nav-link').forEach((button) => {
-    button.addEventListener('click', () => toggleSection(button.dataset.section));
+    button.addEventListener('click', () => {
+      toggleSection(button.dataset.section);
+      if (button.dataset.section === 'statistics') {
+        renderAnalytics();
+      }
+    });
   });
 
   setDefaultDate();
 
-  const dateToggle = document.getElementById('datePickerToggle');
   const dateInput = document.getElementById('incomeDate');
-  if (dateToggle && dateInput) {
-    dateToggle.addEventListener('click', () => {
-      dateInput.classList.toggle('hidden');
-      dateInput.focus();
-    });
-
+  if (dateInput) {
     dateInput.addEventListener('change', () => {
-      dateInput.classList.add('hidden');
-      dateToggle.textContent = `Fecha: ${dateInput.value || 'Seleccionar fecha'}`;
+      dateInput.value = dateInput.value || new Date().toISOString().slice(0, 10);
     });
   }
 
   const cashInput = document.getElementById('cashInput');
   const transferInput = document.getElementById('transferInput');
   const qrInput = document.getElementById('qrInput');
-  [cashInput, transferInput, qrInput].forEach((input) => {
+  const pedidosInput = document.getElementById('pedidosYaInput');
+  [cashInput, transferInput, qrInput, pedidosInput].forEach((input) => {
     input?.addEventListener('input', () => {
       const sanitized = sanitizeNumber(input.value);
       input.value = sanitized;
@@ -595,6 +1255,39 @@ async function initDashboardPage() {
     input?.addEventListener('input', renderDashboard);
   });
 
+  const analyticsTabs = document.querySelectorAll('.analytics-tab');
+  analyticsTabs.forEach((button) => {
+    button.addEventListener('click', () => {
+      analyticsTabs.forEach((item) => item.classList.toggle('active', item === button));
+      renderAnalytics();
+    });
+  });
+
+  const analyticsRangeButtons = document.querySelectorAll('.analytics-range-btn');
+  analyticsRangeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      analyticsRangeButtons.forEach((item) => item.classList.toggle('active', item === button));
+      renderAnalytics();
+    });
+  });
+
+  const analyticsFromDate = document.getElementById('analyticsFromDate');
+  const analyticsToDate = document.getElementById('analyticsToDate');
+
+  const today = new Date();
+  const initialStart = new Date(today);
+  initialStart.setDate(today.getDate() - 29);
+  if (analyticsFromDate) analyticsFromDate.value = formatDateInput(initialStart);
+  if (analyticsToDate) analyticsToDate.value = formatDateInput(today);
+
+  const refreshAnalyticsCustomRange = () => {
+    document.querySelectorAll('.analytics-range-btn').forEach((item) => item.classList.remove('active'));
+    renderAnalytics();
+  };
+
+  analyticsFromDate?.addEventListener('change', refreshAnalyticsCustomRange);
+  analyticsToDate?.addEventListener('change', refreshAnalyticsCustomRange);
+
   const form = document.getElementById('incomeForm');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -604,6 +1297,8 @@ async function initDashboardPage() {
     const efectivo = Number(sanitizeNumber(document.getElementById('cashInput').value));
     const transferencias = Number(sanitizeNumber(document.getElementById('transferInput').value));
     const qr = Number(sanitizeNumber(document.getElementById('qrInput').value));
+    const pedidosYa = Number(sanitizeNumber(document.getElementById('pedidosYaInput')?.value || 0));
+    const stock = (document.getElementById('stockInput')?.value || '').trim();
     const notas = document.getElementById('notesInput').value.trim();
 
     try {
@@ -611,7 +1306,8 @@ async function initDashboardPage() {
       if (sessionState) {
         await fetchJson('/api/records', {
           method: 'POST',
-          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, notas })
+          credentials: 'include',
+          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, notas, stock })
         });
       } else {
         const allRecords = getStoredRecords();
@@ -624,25 +1320,34 @@ async function initDashboardPage() {
           efectivo,
           transferencias,
           qr,
+          pedidosYa,
           notas,
-          total: efectivo + transferencias + qr
+          stock,
+          total: efectivo + transferencias + qr + pedidosYa
         });
         saveStoredRecords(allRecords);
       }
 
       form.reset();
       setDefaultDate();
-      if (dateToggle) dateToggle.textContent = 'Seleccionar fecha';
       await renderDashboard();
-      alert('Ingreso cargado correctamente.');
+      showNotice('Ingreso cargado', 'El ingreso fue cargado correctamente.', 'success');
     } catch (error) {
-      alert(error.message || 'No se pudo guardar el ingreso.');
+      showNotice('No se pudo guardar', error.message || 'No se pudo guardar el ingreso.', 'error');
     }
   });
 
   initEmployeeForm();
   await renderEmployees();
   await renderDashboard();
+  // init records-by-date viewer
+  const recordsDate = document.getElementById('recordsDate');
+  if (recordsDate) {
+    const today = new Date().toISOString().slice(0,10);
+    recordsDate.value = today;
+    recordsDate.addEventListener('change', () => renderRecordsByDate(recordsDate.value));
+    await renderRecordsByDate(recordsDate.value);
+  }
 }
 
 if (document.getElementById('loginForm')) {

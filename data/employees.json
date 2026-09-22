@@ -1,0 +1,14 @@
+[
+  {
+    "id": 5,
+    "name": "Patricio",
+    "last_name": "Elinger",
+    "role": "Encargado",
+    "password_hash": "$2a$10$mW5qRdU3UJjOzCZcWYuXYebBuuRHL7EbniVahrw6odvadH//WeVeG",
+    "hourly_rate": 4200,
+    "phone": "3885176803",
+    "branch": "Centro",
+    "notes": "",
+    "created_at": "2026-09-20T17:52:29.000Z"
+  }
+]

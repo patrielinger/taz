@@ -1,0 +1,15 @@
+{
+  "ignore": [
+    "data/*",
+    "uploads/*",
+    "node_modules/*",
+    ".git/*"
+  ],
+  "watch": [
+    "server.js",
+    "*.js",
+    "admin/**/*.js",
+    "*.html"
+  ],
+  "ext": "js,json,html"
+}

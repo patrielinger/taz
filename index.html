@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TAZ — Me gusta el pollo frito, me gustas tú.</title>
+<link rel="shortcut icon" href="img/logo-red.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -17,7 +18,7 @@
   <button class="menu" id="menu">☰</button>
   <nav class="nav" id="nav">
     <a href="#inicio">Inicio</a><a href="#nosotros">Nosotros</a><a href="#especialidades">Menú</a><a href="#sucursales">Sucursales</a><a href="#contacto">Contacto</a>
-    <a class="order" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener">🛵 Pedir ahora</a>
+    <a class="order" href="https://www.pedidosya.com.ar/restaurantes/san-salvador-de-jujuy/taz-sandwiches-74b61647-c286-40a2-ab55-78c9b8667347-menu" target="_blank" rel="noopener">Pedir ahora</a>
   </nav>
 </header>
 
@@ -28,9 +29,14 @@
     <div class="hero-copy">
       <span class="red">TAZ · JUJUY</span>
       <h1 class="title-inicio">ME GUSTA EL<br><span>POLLO FRITO,</span><br>ME GUSTAS TÚ.</h1>
+
+      <div class="hero-visual dp-mobile" aria-label="Imagen promocional de TAZ">
+      <img src="img/pollo.webp" alt="Pollo frito TAZ" loading="eager" fetchpriority="high">
+    </div>
+
       <p class="desc">Pollo frito, alitas, nuggets con bastones de queso, bucket, sándwiches de pollo y CH-POP.</p>
 
-      <div class="buttons"><a class="btn redbtn" href="#especialidades">Ver especialidades →</a><a class="btn outline pedidosya-link" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener">
+      <div class="buttons"><a class="btn redbtn" href="#especialidades">Ver especialidades →</a><a class="btn outline pedidosya-link" href="https://www.pedidosya.com.ar/restaurantes/san-salvador-de-jujuy/taz-sandwiches-74b61647-c286-40a2-ab55-78c9b8667347-menu" target="_blank" rel="noopener">
         <img class="pedidosya-icon" src="img/pedidosyalogo.svg" alt="PedidosYa"> Pedir por PedidosYa ↗</a></div>
       
         <div class="hours"><span class="open">● ABIERTO TODOS LOS DÍAS</span><span>19:30 — 23:30</span></div>
@@ -40,7 +46,7 @@
       </div>
     </div>
 
-    <div class="hero-visual" aria-label="Imagen promocional de TAZ">
+    <div class="hero-visual dp-pc" aria-label="Imagen promocional de TAZ">
       <img src="img/pollo.webp" alt="Pollo frito TAZ" loading="eager" fetchpriority="high">
     </div>
   </div>
@@ -61,8 +67,8 @@
   <div class="food-grid">
     <article class="card"><div class="photo"><img src="img/menu/pollo.png" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">01</span><h3>Pollo frito</h3><p>Crujiente por fuera, jugoso por dentro.</p></div></article>
     <article class="card"><div class="photo"><img src="img/menu/alitas.png" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">02</span><h3>Alitas picantes</h3><p>El sabor que te hace volver.</p></div></article>
-    <article class="card"><div class="photo"><img src="img/menu/spf.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">03</span><h3>SPF (Sandwich de pollo)</h3><p>Pochoclitos de pollo trozado, ideales para acompañar.</p></div></article>
-    <article class="card"><div class="photo"><img src="img/menu/nuggets.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">04</span><h3>Nuggets & CO</h3><p>Nuggets de pollo con bastones de queso.</p></div></article>
+    <article class="card"><div class="photo"><img src="img/menu/spf.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">03</span><h3>SPF (Sandwich de pollo)</h3><p>-</p></div></article>
+    <article class="card"><div class="photo"><img src="img/menu/nuggets.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">04</span><h3>Nuggets & CO</h3><p>-</p></div></article>
     <article class="card"><div class="photo"><img src="img/menu/balde.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">05</span><h3>Balde de pollo frito</h3><p>Mix de las especialidades de la casa, perfecto para compartir.</p></div></article>
     <article class="card"><div class="photo"><img src="img/menu/ch-pop.jpg" alt="Alitas picantes TAZ" loading="lazy"></div><div class="info"><span class="num">06</span><h3>CH-POP</h3><p>Pochoclitos de pollo trozado, ideales para acompañar.</p></div></article>
   </div>
@@ -77,47 +83,97 @@
 <section class="section" id="sucursales">
   <div class="title"><span class="red">Encontranos</span><h2>NUESTRAS<br><span>SUCURSALES</span></h2></div>
   <div class="branch-grid">
-    <article class="branch">
+    <article class="branch featured">
       <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Centro TAZ" loading="lazy"></div>
       <span class="num">01</span>
       <h3>Centro</h3>
       <p class="address">Alvear 1346</p>
-      <a class="phone" href="tel:+543884798839">📞 388 479-8839</a>
-      <a class="map" href="https://maps.app.goo.gl/18DMqSbD32LCx25bA" target="_blank" rel="noopener">Ver ubicación ↗</a>
+      <div class="branch-actions" aria-label="Acciones de sucursal Centro">
+        <a class="branch-action" href="https://wa.me/543884496174" target="_blank" rel="noopener">
+          <img src="img/whatsapp.svg" alt="WhatsApp" aria-hidden="true">
+          <span>WhatsApp</span>
+        </a>
+        <a class="branch-action" href="tel:+543884496174">
+          <img src="img/telefono.svg" alt="Teléfono" aria-hidden="true">
+          <span>Telefono</span>
+        </a>
+        <a class="branch-action" href="https://maps.app.goo.gl/18DMqSbD32LCx25bA" target="_blank" rel="noopener">
+          <img src="img/ubicacion.svg" alt="Ubicación" aria-hidden="true">
+          <span>Ver ubicacion</span>
+        </a>
+      </div>
     </article>
 
     <article class="branch">
       <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Ciudad de Nieva TAZ" loading="lazy"></div>
-      <span class="num">02</span>
       <h3>Ciudad de Nieva</h3>
       <p class="address">Avenida Carrillo 574</p>
-      <a class="phone" href="tel:+543885930629">📞 388 593-0629</a>
-      <a class="map" href="https://maps.app.goo.gl/kWbL3PRjxLA4MEdn7" target="_blank" rel="noopener">Ver ubicación ↗</a>
+      <div class="branch-actions" aria-label="Acciones de sucursal Ciudad de Nieva">
+        <a class="branch-action" href="https://wa.me/543884798839" target="_blank" rel="noopener">
+          <img src="img/whatsapp.svg" alt="WhatsApp" aria-hidden="true">
+          <span>WhatsApp</span>
+        </a>
+        <a class="branch-action" href="tel:+543884798839">
+          <img src="img/telefono.svg" alt="Teléfono" aria-hidden="true">
+          <span>Telefono</span>
+        </a>
+        <a class="branch-action" href="https://maps.app.goo.gl/kWbL3PRjxLA4MEdn7" target="_blank" rel="noopener">
+          <img src="img/ubicacion.svg" alt="Ubicación" aria-hidden="true">
+          <span>Ver ubicacion</span>
+        </a>
+      </div>
     </article>
 
     <article class="branch">
       <div class="branch-image"><img src="img/pollo.webp" alt="Sucursal Alto Comedero TAZ" loading="lazy"></div>
-      <span class="num">03</span>
       <h3>Alto Comedero</h3>
       <p class="address">Fuerza Aérea 286</p>
-      <a class="phone" href="tel:+543883427093">📞 388 342-7093</a>
-      <a class="map" href="https://www.google.com/maps/search/?api=1&query=Fuerza+Aerea+286,+San+Salvador+de+Jujuy" target="_blank" rel="noopener">Ver ubicación ↗</a>
+      <div class="branch-actions" aria-label="Acciones de sucursal Alto Comedero">
+        <a class="branch-action" href="https://wa.me/543885901847" target="_blank" rel="noopener">
+          <img src="img/whatsapp.svg" alt="WhatsApp" aria-hidden="true">
+          <span>WhatsApp</span>
+        </a>
+        <a class="branch-action" href="tel:+543885901847">
+          <img src="img/telefono.svg" alt="Teléfono" aria-hidden="true">
+          <span>Telefono</span>
+        </a>
+        <a class="branch-action" href="https://www.google.com/maps/search/?api=1&query=Fuerza+Aerea+286,+San+Salvador+de+Jujuy" target="_blank" rel="noopener">
+          <img src="img/ubicacion.svg" alt="Ubicación" aria-hidden="true">
+          <span>Ver ubicacion</span>
+        </a>
+      </div>
     </article>
   </div>
-  <div class="hoursbar"><span class="dot">●</span><div><strong>ABIERTO TODOS LOS DÍAS</strong><span>Lunes a domingo · 19:30 — 23:30</span></div></div>
+  <div class="hoursbar"><span class="dot">●</span><div><strong>ABIERTO TODOS LOS DÍAS</strong><span style="text-align: end; width: 100%; display: block;">Lunes a domingo · 19:30 — 23:30</span></div></div>
 </section>
 
 <section class="delivery">
   <div><span class="red">Delivery</span><h2>¿TENÉS HAMBRE?<br><span>PEDÍ TAZ.</span></h2><p>Pedí tus favoritos de TAZ a través de PedidosYa. Tocá el botón y continuá tu pedido desde la plataforma.</p>
-    <a class="btn redbtn delivery-cta" href="https://www.pedidosya.com.ar/" target="_blank" rel="noopener">🛵 PEDIR POR PEDIDOSYA ↗</a>
+    <a class="btn redbtn delivery-cta" href="https://www.pedidosya.com.ar/restaurantes/san-salvador-de-jujuy/taz-sandwiches-74b61647-c286-40a2-ab55-78c9b8667347-menu" target="_blank" rel="noopener">🛵 PEDIR POR PEDIDOSYA ↗</a>
     <small class="note">Más adelante podemos sustituir este enlace por el enlace directo a la ficha de TAZ.</small>
   </div>
   <div class="placeholder"><img src="img/pedidosya-seeklogo.svg" alt="PedidosYa" loading="lazy"></div>
 </section>
 
 <section class="section contact" id="contacto">
-  <div><span class="red">Hablemos</span><h2>NO TE QUEDES<br><span>CON LAS GANAS.</span></h2><div class="contact-links"><a href="https://wa.me/543884798839" target="_blank" rel="noopener">💬 WhatsApp · 388 479-8839 ↗</a><a href="tel:+543883427093">📞 Solo llamadas · 388 342-7093</a></div></div>
-  <div class="instagram"><span class="red">Seguinos</span><h3>@taz_jujuy</h3><a href="https://www.instagram.com/taz_jujuy/" target="_blank" rel="noopener">Ver Instagram ↗</a></div>
+  <div><span class="red">Hablemos</span><h2>NO TE QUEDES<br><span>CON LAS GANAS.</span></h2></div>
+  <div class="instagram">
+    <span class="red">Seguinos</span>
+    <div class="social-list" aria-label="Redes sociales">
+      <a class="social-item" href="https://www.instagram.com/taz_jujuy/" target="_blank" rel="noopener" aria-label="Instagram">
+        <img src="img/instagram.svg" alt="Instagram" loading="lazy">
+        <span>@taz_jujuy</span>
+      </a>
+      <a class="social-item" href="https://www.facebook.com/p/Taz-Sandwiches-100057586092473/" target="_blank" rel="noopener" aria-label="Facebook">
+        <img src="img/facebook.svg" alt="Facebook" loading="lazy">
+        <span>Taz Sandwiches</span>
+      </a>
+      <a class="social-item" href="https://www.tiktok.com/@taz.sandwiches" target="_blank" rel="noopener" aria-label="TikTok">
+        <img src="img/tiktok.svg" alt="TikTok" loading="lazy">
+        <span>@taz.sandwiches</span>
+      </a>
+    </div>
+  </div>
 </section>
 </main>
 

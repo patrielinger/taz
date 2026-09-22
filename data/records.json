@@ -1,0 +1,17 @@
+[
+  {
+    "id": 6,
+    "fecha": "2026-09-20",
+    "hora": "18:04:38",
+    "usuario": "Patricio Elinger",
+    "sucursal": "Hattogu",
+    "efectivo": 500020,
+    "transferencias": 476000,
+    "qr": 456500,
+    "pedidosYa": 4,
+    "notas": "00",
+    "stock": "00",
+    "total": 1432524,
+    "created_at": "2026-09-20T18:04:38.744Z"
+  }
+]

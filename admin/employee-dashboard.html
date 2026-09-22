@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TAZ Admin · Empleados</title>
+<link rel="shortcut icon" href="img/logo-red.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -18,6 +19,7 @@
 
     <nav class="sidebar-nav">
       <button class="nav-link active" data-section="dashboard">Inicio</button>
+      <button class="nav-link" data-section="statistics">Estadísticas</button>
       <button class="nav-link" data-section="employees">Empleados</button>
     </nav>
   </aside>
@@ -27,7 +29,7 @@
       <div class="admin-header-inner">
         <div>
           <span class="eyebrow">TAZ · PANEL</span>
-          <h1>Dashboard del administrador</h1>
+          <h1>INGRESOS</h1>
         </div>
         <button id="logoutBtn" type="button" class="secondary-btn">Cerrar sesión</button>
       </div>
@@ -46,23 +48,22 @@
           <form id="incomeForm" class="admin-form">
             <div class="field-row two-cols">
               <div class="field-group">
-                <label for="datePickerToggle">Fecha</label>
-                <button type="button" id="datePickerToggle" class="secondary-btn date-toggle">Seleccionar fecha</button>
-                <input type="date" id="incomeDate" class="hidden" required>
+                <label for="incomeDate">Fecha</label>
+                <input type="date" id="incomeDate" required>
               </div>
 
               <div class="field-group">
                 <label for="branchSelect">Sucursal</label>
                 <select id="branchSelect" required>
                   <option value="Centro">Centro</option>
-                  <option value="Ciudad de Nieva">Ciudad de Nieva</option>
+                  <option value="Nieva">Nieva</option>
                   <option value="Alto Comedero">Alto Comedero</option>
                   <option value="Hattogu">Hattogu</option>
                 </select>
               </div>
             </div>
 
-            <div class="field-row three-cols">
+            <div class="field-row payment-grid">
               <div class="field-group">
                 <label for="cashInput">Efectivo</label>
                 <input type="text" id="cashInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
@@ -77,11 +78,23 @@
                 <label for="qrInput">QR</label>
                 <input type="text" id="qrInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
               </div>
+
+              <div class="field-group">
+                <label for="pedidosYaInput">PedidosYa</label>
+                <input type="text" id="pedidosYaInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
             </div>
 
-            <div class="field-group">
-              <label for="notesInput">Notas del día</label>
-              <textarea id="notesInput" rows="4" placeholder="Ej: Cierre tarde, promociones, ajustes..."></textarea>
+            <div class="field-row notes-stock-grid">
+              <div class="field-group">
+                <label for="notesInput">Notas del día</label>
+                <textarea id="notesInput" rows="4" placeholder="Ej: Cierre tarde, promociones, ajustes..."></textarea>
+              </div>
+
+              <div class="field-group">
+                <label for="stockInput">Stock / faltantes</label>
+                <textarea id="stockInput" rows="4" placeholder="Ej: Nuggets, Gaseosa 1L"></textarea>
+              </div>
             </div>
 
             <button type="submit" class="primary-btn submit-btn">Subir</button>
@@ -123,6 +136,7 @@
                   <th>Efectivo</th>
                   <th>Transferencias</th>
                   <th>QR</th>
+                  <th>PedidosYa</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -153,11 +167,50 @@
         </section>
 
         <section class="panel">
+          <div class="panel-head between">
+            <div>
+              <span class="eyebrow">Registros</span>
+              <h2>Buscar por fecha</h2>
+            </div>
+            <div class="mini-filter">
+              <label for="recordsDate">Seleccionar fecha</label>
+              <input type="date" id="recordsDate">
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Sucursal</th>
+                  <th>Usuario</th>
+                  <th>Efectivo</th>
+                  <th>Transferencias</th>
+                  <th>QR</th>
+                  <th>PedidosYa</th>
+                  <th>Total</th>
+                  <th>Notas</th>
+                  <th>Stock</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="recordsByDateTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
           <div class="panel-head">
             <div>
               <span class="eyebrow">Registros</span>
               <h2>Historial por día</h2>
             </div>
+          </div>
+
+          <div id="lastRecordPanel" class="panel" style="margin:12px; padding:12px; display:none;">
+            <strong>Último registro (últimas 24h):</strong>
+            <div id="lastRecordContent" style="margin-top:8px">—</div>
           </div>
 
           <div class="table-wrap">
@@ -171,14 +224,103 @@
                   <th>Efectivo</th>
                   <th>Transferencias</th>
                   <th>QR</th>
+                  <th>PedidosYa</th>
                   <th>Total</th>
                   <th>Notas</th>
+                  <th>Stock</th>
                 </tr>
               </thead>
               <tbody id="dailyRecordsTable"></tbody>
             </table>
           </div>
         </section>
+      </section>
+
+      <section id="statistics" class="admin-section">
+        <div class="panel analytics-panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">Estadísticas</span>
+              <h2>Rendimiento por sucursal</h2>
+            </div>
+          </div>
+
+          <div id="analyticsTabs" class="analytics-tabs">
+            <button type="button" class="analytics-tab active" data-analytics="Negocio">Negocio</button>
+            <button type="button" class="analytics-tab" data-analytics="Centro">Centro</button>
+            <button type="button" class="analytics-tab" data-analytics="Ciudad de Nieva">Ciudad de Nieva</button>
+            <button type="button" class="analytics-tab" data-analytics="Alto Comedero">Alto Comedero</button>
+            <button type="button" class="analytics-tab" data-analytics="Hattogu">Hattogu</button>
+          </div>
+
+          <div class="stats-grid analytics-grid">
+            <article class="stat-card panel">
+              <span>Últimos 7 días</span>
+              <strong id="analyticsThirtyTotal">$0</strong>
+            </article>
+            <article class="stat-card panel">
+              <span>Ingresos del mes</span>
+              <strong id="analyticsMonthTotal">$0</strong>
+            </article>
+            <article class="stat-card panel">
+              <span>Promedio por día</span>
+              <strong id="analyticsDailyAverage">$0</strong>
+            </article>
+          </div>
+
+          <section class="panel chart-panel analytics-chart-wrap">
+            <div class="panel-head between analytics-header">
+              <div>
+                <span class="eyebrow">Historial</span>
+                <h2 id="analyticsChartTitle">Últimos 30 días</h2>
+              </div>
+              <div class="analytics-range-controls">
+                <div class="analytics-shortcuts">
+                  <button type="button" class="analytics-range-btn active" data-days="7">7 días</button>
+                  <button type="button" class="analytics-range-btn" data-days="14">14 días</button>
+                  <button type="button" class="analytics-range-btn" data-days="30">30 días</button>
+                  <button type="button" class="analytics-range-btn" data-days="90">90 días</button>
+                </div>
+                <div class="analytics-custom-range">
+                  <input type="date" id="analyticsFromDate">
+                  <input type="date" id="analyticsToDate">
+                </div>
+              </div>
+            </div>
+
+            <canvas id="analyticsChart" width="900" height="280"></canvas>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Registros</span>
+                <h2 id="analyticsTableTitle">Historial</h2>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Sucursal</th>
+                    <th>Encargado</th>
+                    <th>Efectivo</th>
+                    <th>Transferencias</th>
+                    <th>QR</th>
+                    <th>PedidosYa</th>
+                    <th>Total</th>
+                    <th>Notas</th>
+                    <th>Stock</th>
+                  </tr>
+                </thead>
+                <tbody id="analyticsRecordsTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section id="employees" class="admin-section">
@@ -225,6 +367,11 @@
               <input type="tel" id="employeePhone" required>
             </div>
 
+            <div class="field-group employee-password-field hidden">
+              <label for="employeePassword">Contraseña (solo encargados)</label>
+              <input type="password" id="employeePassword" placeholder="Crear contraseña">
+            </div>
+
             <div class="field-group employee-notes-field hidden">
               <label for="employeeNotes">Notas del empleado</label>
               <textarea id="employeeNotes" rows="4" placeholder="Escribí comentarios, observaciones o tareas del empleado..."></textarea>
@@ -249,6 +396,20 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="appModal" class="app-modal hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
+      <div class="modal-header">
+        <h3 id="appModalTitle">Mensaje</h3>
+        <button type="button" class="modal-close" data-modal-close="true" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body" id="appModalBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-modal-action="cancel">Cancelar</button>
+        <button type="button" class="primary-btn" data-modal-action="confirm">Aceptar</button>
+      </div>
+    </div>
   </div>
 
   <script src="admin.js"></script>
