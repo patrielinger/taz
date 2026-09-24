@@ -56,7 +56,7 @@ The app retries database initialization in `initDatabase()`. If MySQL is still b
 
 ### Docker volume behavior
 
-The container mounts the project directory into `/app`, while `node_modules` stays in the container. Rebuilding with `docker-compose up --build` is the safest way to refresh dependencies and the app.
+The container mounts the project directory into `/app`, while `node_modules` stays in the container. Rebuilding with `docker-compose up --build` is the safest way to refreshh dependencies and the app.
 
 ## Validation checklist
 
@@ -72,3 +72,39 @@ Before considering a fix complete:
 - Do not remove or bypass the JSON persistence layer without checking whether the app intentionally relies on it.
 - Do not rely on direct `node server.js` execution inside Docker when the project is meant to run with `npm run dev` under nodemon.
 - If a change touches auth/session behavior, test the browser flow end-to-end, not only the backend route.
+
+## Instrucciones para agentes AI
+
+Breve guía para que agentes automatizados trabajen productivamente en este repositorio:
+
+- **Propósito:** realizar cambios de código pequeños y dirigidos (bugfixes, ajustes de UI, endpoints), crear PRs aisladas y proponer mejoras de arquitectura cuando sea necesario.
+- **Archivos clave:** servidor en [server.js](server.js), front static en [index.html](index.html), [menu.html](menu.html), estilos en [styles.css](styles.css), lógica cliente en [script.js](script.js), datos persistentes en [data/](data/).
+- **Comandos habituales:**
+
+```bash
+npm install
+npm run dev   # levanta nodemon localmente
+docker-compose up --build   # flujo recomendado con MySQL
+```
+
+- **Convenciones importantes:**
+	- Mantener sincronía entre la persistencia MySQL y los JSON en `data/` si se cambia la estructura de datos.
+	- Evitar tocar `uploads/` o `data/` en pruebas automatizadas sin limpiar o ignorar en nodemon.
+	- Los cambios visuales de front deben respetar variables CSS y estilos ya definidos en `styles.css`.
+
+- **Pruebas y validación:**
+	- Antes de marcar una tarea como lista: arrancar la app (local o Docker), verificar que no hay loops de nodemon y que la ruta/funcionalidad afecta funciona manualmente.
+	- Si se modifica auth/session: probar login-flujo completo en la UI de `admin/`.
+
+- **Restricciones para agentes:**
+	- No eliminar la capa de persistencia JSON sin validar dependencias.
+	- No incluir secretos en el código ni en commits.
+	- Cuando propongas cambios grandes, abre un issue primero describiendo el plan y riesgos.
+
+- **Sugerencia de mejoras de personalización:** crear tareas separadas para: pruebas E2E, scripts de migración para sincronizar JSON↔MySQL, y linters/formatters automáticos.
+
+---
+
+Archivo actualizado por este cambio:
+
+- [AGENTS.md](AGENTS.md) — Añade instrucciones concisas para agentes AI (comandos, convenciones, restricciones y checklist de validación).

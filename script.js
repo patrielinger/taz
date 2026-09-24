@@ -89,7 +89,8 @@ const baseMenu = [
       { name: 'Promo Kids', price: 12000, description: 'Hamburguesa pequeña o 6 nuggets + papas fritas + jugo Baggio + juguete a elección.', available: true },
       { name: 'Vegetariano', price: 7500, description: 'Sabor ahumado y dulce para acompañar.', available: true },
       { name: 'Charles', price: 20000, description: 'Lechuga, tomate, huevo, jamon, queso, carne, pan de miga.', available: true },
-      { name: 'Taz Attack', price: 13000, description: 'Hamburguesa al plato, queso, papas fritas, lechuga, tomate, pan.', available: true }
+      { name: 'Taz Attack', price: 13000, description: 'Hamburguesa al plato, queso, papas fritas, lechuga, tomate, pan.', available: true },
+      { name: 'Pancho', price: 3800, description: '', available: true }
     ]
   },
   {
@@ -103,7 +104,9 @@ const baseMenu = [
   {
     title: 'Postres',
     items: [
-      { name: 'Batido helado', price: 0, description: 'Suave, cremoso y con un dulzor clásico.', available: false }
+      { name: 'Taz Shake de Dulce de Leche', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', available: false },
+      { name: 'Taz Shake de Oreo', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', available: false },
+      { name: 'Taz Shake de Frutilla', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', available: false }
     ]
   },
   {
@@ -145,12 +148,21 @@ const branchMenus = {
   centro: {
     name: 'Centro',
     whatsapp: '543884496174',
-    menu: cloneMenu(baseMenu)
+    // El menú base pero sin 'Pancho' (solo disponible en nieva)
+    menu: (function(){
+      return cloneMenu(baseMenu).map((section) => ({
+        ...section,
+        items: section.items.filter((it) => it.name !== 'Pancho')
+      }));
+    })()
   },
   nieva: {
     name: 'Ciudad de Nieva',
     whatsapp: '543884798839',
-    menu: cloneMenu(baseMenu)
+    // Copia del menú base (sin la sección 'Tragos') — contiene 'Pancho' en 'Extras'
+    menu: (function() {
+      return cloneMenu(baseMenu).filter((s) => s.title !== 'Tragos');
+    })()
   },
   comedero: {
     name: 'Alto Comedero',
