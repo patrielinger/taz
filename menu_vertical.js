@@ -18,26 +18,74 @@ function getBranch() {
 function renderCategoryNav() {
   const nav = document.getElementById('categoryNav');
   if (!nav) return;
+
   const branch = getBranch();
-  const categories = branch.menu.map((s) => s.title);
+  const categories = branch.menu.map((section) => ({
+    title: section.title,
+    count: section.items.length
+  }));
 
-  nav.innerHTML = categories.map((title, idx) => `
-    <button type="button" class="branch-option" data-idx="${idx}">${title}</button>
-  `).join('');
+  nav.innerHTML = `
+    <div class="category-nav-head">
+      <div>
+        <span class="category-kicker">Explorá el menú</span>
+        <strong>Elegí una categoría</strong>
+      </div>
+      <span class="category-hint">Tocá para ir</span>
+    </div>
+    <div class="category-options" role="list">
+      ${categories.map((category, idx) => `
+        <button
+          type="button"
+          class="category-option ${idx === 0 ? 'active' : ''}"
+          data-idx="${idx}"
+          aria-controls="section-${idx}"
+          aria-label="Ver categoría ${category.title}"
+          role="listitem"
+        >
+          <span class="category-number">${String(idx + 1).padStart(2, '0')}</span>
+          <span class="category-option-main">
+            <span class="category-option-title">${category.title}</span>
+            <span class="category-option-meta">${category.count} ${category.count === 1 ? 'producto' : 'productos'}</span>
+          </span>
+          <span class="category-arrow" aria-hidden="true">→</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
 
-  nav.querySelectorAll('.branch-option').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
+  const buttons = nav.querySelectorAll('.category-option');
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
       const idx = Number(btn.dataset.idx);
-      const sectionEls = document.querySelectorAll('.menu-section');
-      const target = sectionEls[idx];
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // marcar activo
-        nav.querySelectorAll('.branch-option').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      }
+      const target = document.getElementById(`section-${idx}`);
+
+      if (!target) return;
+
+      buttons.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-current', 'false');
+      });
+
+      btn.classList.add('active');
+      btn.setAttribute('aria-current', 'true');
+
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+
+      // En móvil, deja visible la categoría seleccionada.
+      btn.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest'
+      });
     });
   });
+
+  if (buttons[0]) buttons[0].setAttribute('aria-current', 'true');
 }
 
 function renderVerticalMenu() {
@@ -51,7 +99,7 @@ function renderVerticalMenu() {
       <ul class="vertical-list">
         ${section.items.map((item) => `
           <li class="vertical-item">
-            <img class="thumb" src="img/menu/${(item.name).toLowerCase().replace(/[^a-z0-9]+/g,'_')}.webp" alt="${item.name}" onerror="this.style.background='#121212'">
+            <img loading="lazy" class="thumb" src="${item.photo && item.photo.length ? item.photo : 'img/menu/' + (item.name).toLowerCase().replace(/[^a-z0-9]+/g,'_') + '.webp'}" alt="${item.name}" onerror="this.style.background='#121212'; this.src='';">
             <div class="info">
               <span class="name">${item.name}</span>
               ${item.description ? `<span class="desc">${item.description}</span>` : ''}
@@ -77,7 +125,11 @@ function renderVerticalMenu() {
         const idx = sections.indexOf(entry.target);
         nav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
         const btn = nav.querySelector(`button[data-idx="${idx}"]`);
-        if (btn) btn.classList.add('active');
+        if (btn) {
+          btn.classList.add('active');
+          btn.setAttribute('aria-current', 'true');
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
       }
     });
   }, { root: null, rootMargin: '-20% 0px -60% 0px', threshold: 0 });
