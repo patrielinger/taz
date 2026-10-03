@@ -1,9 +1,10 @@
 services:
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: taz_app
+
     restart: unless-stopped
 
     depends_on:
@@ -19,14 +20,15 @@ services:
       SESSION_SECRET: taz_super_secret
       PORT: 3000
 
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
 
-    command: npm run dev
+    volumes:
+      - taz_uploads:/app/uploads
 
   db:
     image: mysql:8.0
-    container_name: taz_db
+
     restart: unless-stopped
 
     environment:
@@ -39,7 +41,16 @@ services:
       - mysql_data:/var/lib/mysql
 
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-ppassword"
+        ]
       interval: 5s
       timeout: 10s
       retries: 20
@@ -47,3 +58,4 @@ services:
 
 volumes:
   mysql_data:
+  taz_uploads:
