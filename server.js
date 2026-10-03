@@ -16,15 +16,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname)));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 app.use((req, res, next) => {
   if (req.hostname === 'admin.tazjujuy.com') {
     req.url = '/admin' + (req.url === '/' ? '/' : req.url);
   }
   next();
 });
+app.use(express.static(path.join(__dirname)));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'taz-secret',
