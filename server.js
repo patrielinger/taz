@@ -19,6 +19,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+app.use((req, res, next) => {
+  if (req.hostname === 'admin.tazjujuy.com') {
+    req.url = '/admin' + (req.url === '/' ? '/' : req.url);
+  }
+  next();
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'taz-secret',
   resave: false,
@@ -633,6 +640,13 @@ app.get('/api/files/:id/download', ensureAuth, async (req, res) => {
   }
 
   res.download(filePath, file.original_name);
+});
+
+app.use((req, res, next) => {
+  if (req.hostname === 'admin.tazjujuy.com') {
+    req.url = '/admin' + (req.url === '/' ? '/' : req.url);
+  }
+  next();
 });
 
 app.get('/admin/*', (req, res) => {
