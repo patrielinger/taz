@@ -893,13 +893,15 @@ async function renderAnalytics() {
 
   setupChartHover(canvas, chartPoints);
 
+  const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
+
   if (!selectedRecords.length) {
-    table.innerHTML = '<tr><td colspan="11">No hay registros para el rango seleccionado.</td></tr>';
+    table.innerHTML = `<tr><td colspan="${isAdmin ? 12 : 11}">No hay registros para el rango seleccionado.</td></tr>`;
     return;
   }
 
   table.innerHTML = selectedRecords.map((record) => `
-    <tr>
+    <tr data-id="${record.id}">
       <td>${record.fecha}</td>
       <td>${record.hora || '—'}</td>
       <td>${normalizeBranchName(record.sucursal)}</td>
@@ -907,12 +909,68 @@ async function renderAnalytics() {
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
-      <td>${money(record.pedidosYa || 0)}</td>
+      <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
+      <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
     </tr>
   `).join('');
+
+  if (isAdmin) {
+    document.querySelectorAll('#analyticsRecordsTable .edit-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = selectedRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      openRecordEditor(record, async (payload) => {
+        try {
+          await fetchJson(`/api/records/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              fecha: payload.fecha || record.fecha,
+              sucursal: payload.sucursal || record.sucursal,
+              efectivo: payload.efectivo,
+              transferencias: payload.transferencias,
+              qr: payload.qr,
+              pedidosYa: payload.pedidosYa,
+              notas: payload.notas,
+              stock: payload.stock,
+            })
+          });
+          await renderAnalytics();
+          await renderDashboard();
+          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+        } catch (err) {
+          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
+        }
+      });
+    }));
+
+    document.querySelectorAll('#analyticsRecordsTable .delete-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = selectedRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      setupModal().show({
+        title: 'Eliminar ingreso',
+        body: `<p>¿Eliminar el registro de ${normalizeBranchName(record.sucursal)} del ${record.fecha}?</p>`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        showCancel: true,
+        onConfirm: async () => {
+          try {
+            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            await renderAnalytics();
+            await renderDashboard();
+            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+          } catch (err) {
+            showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
+          }
+        }
+      });
+    }));
+  }
 }
 
 async function renderDashboard() {
@@ -1179,13 +1237,13 @@ function initLoginPage() {
         } else {
           sessionStorage.setItem(SESSION_KEY, user.username || 'admin');
         }
-        window.location.href = data.redirect || '/admin/employee-dashboard.html';
+        window.location.href = data.redirect || 'employee-dashboard.html';
       }
     } catch (error) {
       const adminMatch = ADMIN_USERS.find((u) => u.username === username && u.password === password);
       if (adminMatch) {
         sessionStorage.setItem(SESSION_KEY, adminMatch.username);
-        window.location.href = '/admin/employee-dashboard.html';
+        window.location.href = 'employee-dashboard.html';
         return;
       }
 
@@ -1193,7 +1251,7 @@ function initLoginPage() {
       const encargado = employees.find((e) => e.phone === username && e.password === password && e.role === 'Encargado');
       if (encargado) {
         sessionStorage.setItem(SESSION_KEY, `encargado:${encargado.phone}`);
-        window.location.href = '/admin/encargado.html';
+        window.location.href = 'encargado.html';
         return;
       }
 
@@ -1207,7 +1265,7 @@ function initLoginPage() {
 async function initDashboardPage() {
   const sessionUser = await syncSessionFromServer();
   if (!sessionUser) {
-    window.location.href = '/admin/index.html';
+    window.location.href = 'index.html';
     return;
   }
 
@@ -1220,7 +1278,7 @@ async function initDashboardPage() {
     }
 
     sessionStorage.removeItem(SESSION_KEY);
-    window.location.href = '/admin/index.html';
+    window.location.href = 'index.html';
   });
 
   document.querySelectorAll('.nav-link').forEach((button) => {

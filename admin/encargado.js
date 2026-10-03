@@ -155,7 +155,7 @@ async function getSessionEncargado() {
 async function initPage() {
   const phone = await getSessionEncargado();
   const sessionValue = sessionStorage.getItem(SESSION_KEY) || '';
-  if (!phone) { window.location.href = '/admin/index.html'; return; }
+  if (!phone) { window.location.href = 'index.html'; return; }
 
   const employees = getStoredEmployees();
   const emp = employees.find((e) => e.phone === phone);
@@ -286,7 +286,7 @@ async function initPage() {
   const logout = document.getElementById('logoutBtn');
   logout?.addEventListener('click', () => {
     sessionStorage.removeItem(SESSION_KEY);
-    window.location.href = '/admin/index.html';
+    window.location.href = 'index.html';
   });
 }
 

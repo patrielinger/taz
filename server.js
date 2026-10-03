@@ -300,7 +300,7 @@ app.post('/api/login', async (req, res) => {
       }
 
       req.session.user = { id: adminUser.id, username: adminUser.username, role: 'Admin', name: 'Administrador', lastName: '' };
-      return res.json({ ok: true, user: req.session.user, redirect: '/admin/employee-dashboard.html' });
+      return res.json({ ok: true, user: req.session.user, redirect: 'employee-dashboard.html' });
     }
 
     const [empRows] = await pool.execute('SELECT * FROM employees WHERE phone = ? AND role = ?', [username, 'Encargado']);
@@ -325,7 +325,7 @@ app.post('/api/login', async (req, res) => {
       branch: emp.branch || 'Centro'
     };
 
-    return res.json({ ok: true, user: req.session.user, redirect: '/admin/encargado.html' });
+    return res.json({ ok: true, user: req.session.user, redirect: 'encargado.html' });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ message: 'Error interno en autenticación.' });
