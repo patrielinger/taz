@@ -13,7 +13,9 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_ROOT = __dirname;
-const ADMIN_ROOT = path.join(__dirname, 'admin');
+const ADMIN_DIR_NAME = '9f4a7b2c';
+const ADMIN_PUBLIC_PREFIX = `/${ADMIN_DIR_NAME}`;
+const ADMIN_ROOT = path.join(__dirname, ADMIN_DIR_NAME);
 const PUBLIC_HOSTS = new Set(['tazjujuy.com', 'www.tazjujuy.com', 'localhost']);
 const ADMIN_HOSTS = new Set(['admin.tazjujuy.com', 'www.admin.tazjujuy.com', 'admin.localhost']);
 const SESSION_COOKIE_SECURE = process.env.SESSION_SECURE === 'true' || process.env.NODE_ENV === 'production';
@@ -63,8 +65,12 @@ app.use((req, res, next) => {
       return next();
     }
 
+    if (req.path === ADMIN_PUBLIC_PREFIX || req.path.startsWith(`${ADMIN_PUBLIC_PREFIX}/`)) {
+      req.url = req.path.replace(ADMIN_PUBLIC_PREFIX, '') || '/';
+    }
+
     const adminPath = req.path === '/' || req.path === '' ? 'index.html' : req.path.replace(/^\/+/, '');
-    const safePath = adminPath === 'admin' ? 'index.html' : adminPath;
+    const safePath = adminPath === ADMIN_DIR_NAME ? 'index.html' : adminPath;
     const candidate = path.join(ADMIN_ROOT, safePath);
 
     if (safePath && safePath !== 'index.html' && !safePath.startsWith('api/') && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
@@ -74,9 +80,9 @@ app.use((req, res, next) => {
     return res.sendFile(path.join(ADMIN_ROOT, 'index.html'));
   }
 
-  if (isPublicHost && (req.path === '/admin' || req.path.startsWith('/admin/'))) {
-    const targetPath = req.path === '/admin' ? '/' : req.path.replace(/^\/admin/, '');
-    const target = `https://admin.tazjujuy.com${targetPath || '/'}`;
+  if (isPublicHost && (req.path === ADMIN_PUBLIC_PREFIX || req.path.startsWith(`${ADMIN_PUBLIC_PREFIX}/`))) {
+    const targetPath = req.path === ADMIN_PUBLIC_PREFIX ? '/' : req.path.replace(ADMIN_PUBLIC_PREFIX, '') || '/';
+    const target = `https://admin.tazjujuy.com${targetPath}`;
     return res.redirect(301, target);
   }
 
@@ -1994,18 +2000,18 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(PUBLIC_ROOT, 'index.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get(ADMIN_PUBLIC_PREFIX, (req, res) => {
   return res.redirect(301, 'https://admin.tazjujuy.com/');
 });
 
-app.get('/admin/*', (req, res) => {
-  const target = `https://admin.tazjujuy.com${req.path.replace(/^\/admin/, '') || '/'}`;
+app.get(`${ADMIN_PUBLIC_PREFIX}/*`, (req, res) => {
+  const target = `https://admin.tazjujuy.com${req.path.replace(ADMIN_PUBLIC_PREFIX, '') || '/'}`;
   return res.redirect(301, target);
 });
 
 app.get('*', (req, res) => {
-  if (req.path === '/admin' || req.path.startsWith('/admin/')) {
-    return res.redirect(301, `https://admin.tazjujuy.com${req.path.replace(/^\/admin/, '') || '/'}`);
+  if (req.path === ADMIN_PUBLIC_PREFIX || req.path.startsWith(`${ADMIN_PUBLIC_PREFIX}/`)) {
+    return res.redirect(301, `https://admin.tazjujuy.com${req.path.replace(ADMIN_PUBLIC_PREFIX, '') || '/'}`);
   }
 
   const requested = req.path.replace(/^\/+/, '');

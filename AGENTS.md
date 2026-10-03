@@ -5,7 +5,7 @@
 This repo is a Node.js + Express app for a restaurant admin dashboard backed by MySQL, with static frontend pages and JSON fallback files kept in sync for quick reads and local debugging.
 
 - Backend entrypoint: [server.js](server.js)
-- Admin UI: [admin/](admin/)
+- Admin UI: [9f4a7b2c/](9f4a7b2c/)
 - Public pages: [index.html](index.html), [menu.html](menu.html), [styles.css](styles.css), [script.js](script.js)
 - Uploads: [uploads/](uploads/)
 - JSON persistence: [data/](data/)
@@ -35,7 +35,7 @@ npm run dev
 - Auth is session-based using `express-session` and `bcryptjs`; admins and encargados are recognized by different role checks in `/api/login` and route guards.
 - Browser requests to protected routes should send `credentials: 'include'` so the session cookie is sent.
 - File uploads are stored under [uploads/](uploads/) and also recorded in MySQL via the `uploaded_files` table; do not create noisy writes in watched folders.
-- The root pages are mostly static HTML/JS while admin flows are under [admin/](admin/). Keep UI logic close to the page it serves instead of mixing unrelated features together.
+- The root pages are mostly static HTML/JS while admin flows are under [9f4a7b2c/](9f4a7b2c/). Keep UI logic close to the page it serves instead of mixing unrelated features together.
 
 ## Common pitfalls
 
@@ -66,7 +66,7 @@ Before marking a fix complete:
 ## Useful first files to inspect
 
 - [server.js](server.js) for routes, session auth, DB bootstrap, and persisted-data sync logic.
-- [admin/employee-dashboard.html](admin/employee-dashboard.html) and [admin/encargado.js](admin/encargado.js) for admin/encargado UI flows.
+- [9f4a7b2c/employee-dashboard.html](9f4a7b2c/employee-dashboard.html) and [9f4a7b2c/encargado.js](9f4a7b2c/encargado.js) for admin/encargado UI flows.
 - [script.js](script.js) for browser-side API usage and public page behavior.
 - [nodemon.json](nodemon.json) for watched folders and restart-pitfall awareness.
 
