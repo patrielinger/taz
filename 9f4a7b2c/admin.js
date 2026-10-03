@@ -797,6 +797,358 @@ function getActiveAnalyticsRange() {
   return { start: safeStart, end: safeEnd, label: 'rango personalizado', days: Math.max(1, Math.round((safeEnd - safeStart) / 86400000) + 1) };
 }
 
+function formatReportDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+}
+
+function formatReportDateTime(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
+function formatMoneyForPdf(value) {
+  const number = Number(value || 0);
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(number);
+}
+
+function getAnalyticsExportRows() {
+  const analyticsScope = document.querySelector('.analytics-tab.active')?.dataset.analytics || 'Negocio';
+  const fromDate = document.getElementById('analyticsFromDate')?.value;
+  const toDate = document.getElementById('analyticsToDate')?.value;
+
+  if (!fromDate || !toDate) {
+    return null;
+  }
+
+  const records = loadRecordsSync();
+  const source = getRecordsForAnalytics(analyticsScope, records);
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T23:59:59`);
+
+  const filteredRecords = source
+    .filter((record) => {
+      if (!record.fecha) return false;
+      const recordDate = new Date(`${record.fecha}T00:00:00`);
+      return recordDate >= start && recordDate <= end;
+    })
+    .map((record) => ({
+      ...record,
+      fecha: record.fecha || '',
+      hora: record.hora || '',
+      usuario: record.usuario || '—',
+      sucursal: normalizeBranchName(record.sucursal),
+      efectivo: Number(record.efectivo || 0),
+      transferencias: Number(record.transferencias || 0),
+      qr: Number(record.qr || 0),
+      pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
+      tiraxy: Number(record.tiraxy || 0),
+      total: Number(record.total || 0),
+      notas: record.notas || '—',
+      stock: record.stock || '—'
+    }))
+    .sort((a, b) => {
+      const dateDiff = String(b.fecha).localeCompare(String(a.fecha));
+      if (dateDiff !== 0) return dateDiff;
+      return String(b.hora || '00:00:00').localeCompare(String(a.hora || '00:00:00'));
+    });
+
+  const totalEfectivo = filteredRecords.reduce((sum, record) => sum + record.efectivo, 0);
+  const totalTransferencias = filteredRecords.reduce((sum, record) => sum + record.transferencias, 0);
+  const totalQr = filteredRecords.reduce((sum, record) => sum + record.qr, 0);
+  const totalPedidosYa = filteredRecords.reduce((sum, record) => sum + record.pedidosYa, 0);
+  const totalTiraxy = filteredRecords.reduce((sum, record) => sum + record.tiraxy, 0);
+  const totalGeneral = filteredRecords.reduce((sum, record) => sum + record.total, 0);
+  const daysCount = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  const recordCount = filteredRecords.length;
+
+  return {
+    scope: analyticsScope,
+    start,
+    end,
+    records: filteredRecords,
+    summary: {
+      totalEfectivo,
+      totalTransferencias,
+      totalQr,
+      totalPedidosYa,
+      totalTiraxy,
+      totalGeneral,
+      recordCount,
+      promEfectivo: recordCount ? totalEfectivo / recordCount : 0,
+      promTransferencias: recordCount ? totalTransferencias / recordCount : 0,
+      promQr: recordCount ? totalQr / recordCount : 0,
+      promPedidosYa: recordCount ? totalPedidosYa / recordCount : 0,
+      promTiraxy: recordCount ? totalTiraxy / recordCount : 0,
+      promTotal: recordCount ? totalGeneral / recordCount : 0,
+      promDiario: totalGeneral / daysCount
+    }
+  };
+}
+
+async function exportAnalyticsPdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showNotice('PDF no disponible', 'No se pudo cargar la librería de PDF. Intenta nuevamente.', 'error');
+    return;
+  }
+
+  try {
+    const payload = getAnalyticsExportRows();
+    if (!payload || !payload.records.length) {
+      showNotice('Sin registros', 'No hay registros para el rango seleccionado.', 'warning');
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 38;
+    const lineHeight = 14;
+
+    const padCurrency = (value) => formatMoneyForPdf(value);
+
+    const drawHeader = (pageNumber) => {
+      doc.setFillColor(18, 18, 18);
+      doc.rect(0, 0, pageWidth, 54, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('TAZ', margin, 26);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text('Informe de Historial', margin + 60, 26);
+      doc.setFontSize(9);
+      doc.text(`Período: ${formatReportDate(payload.start.toISOString().slice(0, 10))} - ${formatReportDate(payload.end.toISOString().slice(0, 10))}`, margin + 60, 42);
+      doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, pageWidth - 210, 42);
+      doc.text(`Página ${pageNumber}`, pageWidth - 90, 26);
+      doc.setTextColor(0, 0, 0);
+    };
+
+    const drawFooter = (pageNumber, totalPages) => {
+      doc.setTextColor(90, 90, 90);
+      doc.setFontSize(8);
+      doc.text(`Página ${pageNumber} de ${totalPages}`, pageWidth / 2 - 30, pageHeight - 16);
+      doc.text('TAZ · Informe de Historial', margin, pageHeight - 16);
+    };
+
+    const writeSectionTitle = (title, y) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(19, 19, 19);
+      doc.text(title, margin, y);
+      doc.setDrawColor(244, 18, 22);
+      doc.line(margin, y + 5, pageWidth - margin, y + 5);
+      return y + 18;
+    };
+
+    let y = 78;
+    drawHeader(1);
+    y = writeSectionTitle('Resumen general del período', y);
+
+    const summaryItems = [
+      ['Total efectivo', padCurrency(payload.summary.totalEfectivo)],
+      ['Total transferencias', padCurrency(payload.summary.totalTransferencias)],
+      ['Total QR', padCurrency(payload.summary.totalQr)],
+      ['Total Pedidos Ya', padCurrency(payload.summary.totalPedidosYa)],
+      ['Total Tiraxy', padCurrency(payload.summary.totalTiraxy)],
+      ['Total general', padCurrency(payload.summary.totalGeneral)],
+      ['Cantidad de registros', String(payload.summary.recordCount)],
+      ['Promedio efectivo', padCurrency(payload.summary.promEfectivo)],
+      ['Promedio transferencias', padCurrency(payload.summary.promTransferencias)],
+      ['Promedio QR', padCurrency(payload.summary.promQr)],
+      ['Promedio Pedidos Ya', padCurrency(payload.summary.promPedidosYa)],
+      ['Promedio Tiraxy', padCurrency(payload.summary.promTiraxy)],
+      ['Promedio total', padCurrency(payload.summary.promTotal)],
+      ['Promedio diario', padCurrency(payload.summary.promDiario)]
+    ];
+
+    const summaryColWidth = (pageWidth - margin * 2) / 2;
+    summaryItems.forEach(([label, value], index) => {
+      const isLeft = index % 2 === 0;
+      const x = isLeft ? margin : margin + summaryColWidth;
+      const summaryY = y + Math.floor(index / 2) * 26;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(label, x + 10, summaryY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(18, 18, 18);
+      doc.text(String(value), x + 10, summaryY + 14);
+    });
+
+    y = y + 4 + Math.ceil(summaryItems.length / 2) * 26;
+    y = writeSectionTitle('Totales del período', y);
+
+    const totalRows = [
+      ['Efectivo', payload.summary.totalEfectivo],
+      ['Transferencias', payload.summary.totalTransferencias],
+      ['QR', payload.summary.totalQr],
+      ['Pedidos Ya', payload.summary.totalPedidosYa],
+      ['Tiraxy', payload.summary.totalTiraxy],
+      ['Total general', payload.summary.totalGeneral]
+    ];
+
+    const totalStartY = y + 12;
+    totalRows.forEach(([name, value], index) => {
+      const x = margin + (index % 3) * 180;
+      const rowY = totalStartY + Math.floor(index / 3) * 26;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(name, x, rowY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(18, 18, 18);
+      doc.text(padCurrency(value), x + 70, rowY);
+    });
+
+    y = totalStartY + 65;
+    y = writeSectionTitle('Promedios del período', y);
+
+    const avgRows = [
+      ['Promedio efectivo', payload.summary.promEfectivo],
+      ['Promedio transferencias', payload.summary.promTransferencias],
+      ['Promedio QR', payload.summary.promQr],
+      ['Promedio Pedidos Ya', payload.summary.promPedidosYa],
+      ['Promedio Tiraxy', payload.summary.promTiraxy],
+      ['Promedio total', payload.summary.promTotal],
+      ['Promedio diario', payload.summary.promDiario]
+    ];
+
+    avgRows.forEach(([label, value], index) => {
+      const x = margin + (index % 2) * 250;
+      const rowY = y + 22 + Math.floor(index / 2) * 22;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(label, x, rowY);
+      doc.setTextColor(18, 18, 18);
+      doc.text(padCurrency(value), x + 120, rowY);
+    });
+
+    y = y + 110;
+    y = writeSectionTitle('Detalle completo', y);
+
+    const columns = [
+      { title: 'Fecha', width: 54 },
+      { title: 'Hora', width: 42 },
+      { title: 'Usuario', width: 54 },
+      { title: 'Sucursal', width: 54 },
+      { title: 'Efectivo', width: 52 },
+      { title: 'Transfer.', width: 52 },
+      { title: 'QR', width: 38 },
+      { title: 'PYa', width: 38 },
+      { title: 'Tiraxy', width: 42 },
+      { title: 'Total', width: 45 },
+      { title: 'Notas', width: 120 },
+      { title: 'Stock', width: 90 }
+    ];
+
+    const tableHeaderY = y + 12;
+    const tableStartY = tableHeaderY + 18;
+
+    const renderTableHeader = (headerY) => {
+      let currentX = margin;
+      doc.setFillColor(240, 240, 240);
+      doc.rect(margin, headerY, pageWidth - margin * 2, 16, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(18, 18, 18);
+      columns.forEach((column) => {
+        doc.text(column.title, currentX + 4, headerY + 12);
+        currentX += column.width;
+      });
+    };
+
+    let currentY = tableStartY;
+    renderTableHeader(tableHeaderY);
+
+    const addPageIfNeeded = (rowsHeight) => {
+      if (currentY + rowsHeight > pageHeight - 35) {
+        doc.addPage();
+        drawHeader(doc.getNumberOfPages());
+        y = 78;
+        currentY = tableStartY;
+        renderTableHeader(tableHeaderY);
+        drawFooter(doc.getNumberOfPages(), doc.getNumberOfPages());
+      }
+    };
+
+    payload.records.forEach((record) => {
+      const rowValues = [
+        formatReportDate(record.fecha),
+        record.hora || '—',
+        String(record.usuario || '—'),
+        String(record.sucursal || '—'),
+        padCurrency(record.efectivo),
+        padCurrency(record.transferencias),
+        padCurrency(record.qr),
+        padCurrency(record.pedidosYa),
+        padCurrency(record.tiraxy),
+        padCurrency(record.total),
+        record.notas && record.notas !== '—' ? record.notas : '—',
+        record.stock && record.stock !== '—' ? record.stock : '—'
+      ];
+
+      const cellLines = rowValues.map((value, index) => {
+        const maxWidth = columns[index].width - 8;
+        const textValue = String(value || '—');
+        const wrapped = doc.splitTextToSize(textValue, maxWidth);
+        return wrapped.length > 1 ? wrapped : [textValue];
+      });
+
+      const rowHeightValue = Math.max(...cellLines.map((lines) => lines.length)) * 11 + 4;
+      addPageIfNeeded(rowHeightValue + 4);
+
+      let x = margin;
+      const lineTop = currentY;
+      doc.setDrawColor(215, 215, 215);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeightValue, 'S');
+
+      rowValues.forEach((value, index) => {
+        const lines = cellLines[index];
+        const columnWidth = columns[index].width;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(18, 18, 18);
+        lines.forEach((line, lineIndex) => {
+          doc.text(line, x + 4, lineTop + 12 + lineIndex * 10);
+        });
+        x += columnWidth;
+      });
+
+      currentY += rowHeightValue;
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
+      doc.setPage(pageIndex);
+      drawHeader(pageIndex);
+      drawFooter(pageIndex, totalPages);
+    }
+
+    const filename = `TAZ_Historial_${new Date(payload.start).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}_a_${new Date(payload.end).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}.pdf`;
+    doc.save(filename.replace(/\s+/g, ''));
+  } catch (error) {
+    console.error('Error generating PDF', error);
+    showNotice('No se pudo exportar', 'Hubo un error al generar el PDF. Intenta nuevamente.', 'error');
+  }
+}
+
 async function renderAnalytics() {
   const analyticsScope = document.querySelector('.analytics-tab.active')?.dataset.analytics || 'Negocio';
   const records = await loadRecords();
@@ -1366,6 +1718,9 @@ async function initDashboardPage() {
 
   analyticsFromDate?.addEventListener('change', refreshAnalyticsCustomRange);
   analyticsToDate?.addEventListener('change', refreshAnalyticsCustomRange);
+
+  const exportBtn = document.getElementById('exportAnalyticsPdfBtn');
+  exportBtn?.addEventListener('click', exportAnalyticsPdf);
 
   const form = document.getElementById('incomeForm');
   form?.addEventListener('submit', async (event) => {
