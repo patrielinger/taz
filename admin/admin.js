@@ -14,6 +14,7 @@ function normalizeBranchName(branch) {
     Hattogu: 'Hattogu',
     'Jatobú': 'Hattogu',
     Centro: 'Centro',
+    Alvear: 'Centro',
     'Alto Comedero': 'Alto Comedero'
   };
   return map[value] || value;
@@ -225,7 +226,11 @@ function renderBranchSummary(records) {
 
   const branchAverageEl = document.getElementById('branchAverage');
   if (branchAverageEl) {
-    const avg = totals.length ? todayTotal / totals.length : 0;
+    const selectedBranchValue = document.getElementById('branchSelect')?.value || 'Centro';
+    const selectedBranch = normalizeBranchName(selectedBranchValue);
+    const selectedBranchRecords = dayRecords.filter((record) => normalizeBranchName(record.sucursal) === selectedBranch);
+    const selectedBranchTotal = selectedBranchRecords.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const avg = selectedBranchRecords.length ? selectedBranchTotal / selectedBranchRecords.length : 0;
     branchAverageEl.textContent = money(avg);
   }
 }
@@ -1240,12 +1245,28 @@ async function initDashboardPage() {
   const transferInput = document.getElementById('transferInput');
   const qrInput = document.getElementById('qrInput');
   const pedidosInput = document.getElementById('pedidosYaInput');
-  [cashInput, transferInput, qrInput, pedidosInput].forEach((input) => {
+  const tiraxyInput = document.getElementById('tiraxyInput');
+  const tiraxyInputGroup = document.getElementById('tiraxyInputGroup');
+  [cashInput, transferInput, qrInput, pedidosInput, tiraxyInput].forEach((input) => {
     input?.addEventListener('input', () => {
       const sanitized = sanitizeNumber(input.value);
       input.value = sanitized;
     });
   });
+
+  const branchSelect = document.getElementById('branchSelect');
+  const updateTiraxyVisibility = () => {
+    const visible = branchSelect?.value === 'Alvear';
+    if (tiraxyInputGroup) {
+      tiraxyInputGroup.style.display = visible ? 'block' : 'none';
+    }
+    if (!visible && tiraxyInput) {
+      tiraxyInput.value = '0';
+    }
+    renderBranchSummary(getStoredRecords());
+  };
+  branchSelect?.addEventListener('change', updateTiraxyVisibility);
+  updateTiraxyVisibility();
 
   const dayFilter = document.getElementById('dayFilter');
   const chartStart = document.getElementById('chartStart');
@@ -1298,6 +1319,7 @@ async function initDashboardPage() {
     const transferencias = Number(sanitizeNumber(document.getElementById('transferInput').value));
     const qr = Number(sanitizeNumber(document.getElementById('qrInput').value));
     const pedidosYa = Number(sanitizeNumber(document.getElementById('pedidosYaInput')?.value || 0));
+    const tiraxy = Number(sanitizeNumber(document.getElementById('tiraxyInput')?.value || 0));
     const stock = (document.getElementById('stockInput')?.value || '').trim();
     const notas = document.getElementById('notesInput').value.trim();
 
@@ -1307,7 +1329,7 @@ async function initDashboardPage() {
         await fetchJson('/api/records', {
           method: 'POST',
           credentials: 'include',
-          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, notas, stock })
+          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, tiraxy, notas, stock })
         });
       } else {
         const allRecords = getStoredRecords();
@@ -1321,9 +1343,10 @@ async function initDashboardPage() {
           transferencias,
           qr,
           pedidosYa,
+          tiraxy,
           notas,
           stock,
-          total: efectivo + transferencias + qr + pedidosYa
+          total: efectivo + transferencias + qr + pedidosYa + tiraxy
         });
         saveStoredRecords(allRecords);
       }

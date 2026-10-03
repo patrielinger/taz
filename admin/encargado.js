@@ -1,7 +1,7 @@
 const SESSION_KEY = 'taz_admin_session';
 const STORAGE_KEY = 'taz_admin_records';
 const EMPLOYEES_KEY = 'taz_employees';
-const BRANCHES = ['Centro', 'Ciudad de Nieva', 'Alto Comedero', 'Hattogu'];
+const BRANCHES = ['Alvear', 'Centro', 'Ciudad de Nieva', 'Alto Comedero', 'Hattogu'];
 
 function setupModal() {
   let modal = document.getElementById('appModal');
@@ -184,6 +184,8 @@ async function initPage() {
   const transfer = document.getElementById('encTransfer');
   const qr = document.getElementById('encQR');
   const pedidos = document.getElementById('encPedidosYa');
+  const tiraxy = document.getElementById('encTiraxy');
+  const tiraxyField = document.getElementById('encTiraxyField');
   const totalEl = document.getElementById('encTotal');
 
   const setDefault = () => {
@@ -198,13 +200,26 @@ async function initPage() {
     const t = Number(sanitizeNumber(transfer.value));
     const q = Number(sanitizeNumber(qr.value));
     const p = Number(sanitizeNumber(pedidos.value));
-    const sum = c + t + q + p;
+    const tr = Number(sanitizeNumber(tiraxy?.value || '0'));
+    const sum = c + t + q + p + tr;
     totalEl.textContent = money(sum);
     return sum;
   }
 
-  [cash, transfer, qr, pedidos].forEach((el) => el?.addEventListener('input', updateTotal));
-  updateTotal();
+  const updateTiraxyVisibility = () => {
+    const showTiraxy = branchSelect.value === 'Alvear';
+    if (tiraxyField) {
+      tiraxyField.style.display = showTiraxy ? 'block' : 'none';
+    }
+    if (!showTiraxy && tiraxy) {
+      tiraxy.value = '0';
+    }
+    updateTotal();
+  };
+
+  branchSelect?.addEventListener('change', updateTiraxyVisibility);
+  [cash, transfer, qr, pedidos, tiraxy].forEach((el) => el?.addEventListener('input', updateTotal));
+  updateTiraxyVisibility();
 
   const form = document.getElementById('encForm');
   form.addEventListener('submit', async (ev) => {
@@ -216,10 +231,11 @@ async function initPage() {
     const transferencias = Number(sanitizeNumber(transfer.value));
     const qrVal = Number(sanitizeNumber(qr.value));
     const pedidosYa = Number(sanitizeNumber(pedidos.value));
+    const tiraxyVal = Number(sanitizeNumber(tiraxy.value));
     const notas = document.getElementById('encNotes').value.trim();
     const stock = document.getElementById('encStock').value.trim();
     const usuario = emp ? `${emp.name || ''} ${emp.lastName || ''}`.trim() || emp.phone : phone;
-    const total = efectivo + transferencias + qrVal + pedidosYa;
+    const total = efectivo + transferencias + qrVal + pedidosYa + tiraxyVal;
     const sessionState = sessionStorage.getItem(SESSION_KEY);
     if (sessionState) {
       try {
@@ -227,7 +243,7 @@ async function initPage() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fecha, sucursal, efectivo, transferencias, qr: qrVal, pedidosYa, notas, stock })
+          body: JSON.stringify({ fecha, sucursal, efectivo, transferencias, qr: qrVal, pedidosYa, tiraxy: tiraxyVal, notas, stock })
         });
 
         if (!resp.ok) {
@@ -253,6 +269,7 @@ async function initPage() {
         transferencias,
         qr: qrVal,
         pedidosYa,
+        tiraxy: tiraxyVal,
         notas: notas || '',
         stock: stock || '',
         total

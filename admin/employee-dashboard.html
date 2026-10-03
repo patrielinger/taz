@@ -55,8 +55,9 @@
               <div class="field-group">
                 <label for="branchSelect">Sucursal</label>
                 <select id="branchSelect" required>
+                  <option value="Alvear">Alvear</option>
                   <option value="Centro">Centro</option>
-                  <option value="Nieva">Nieva</option>
+                  <option value="Ciudad de Nieva">Ciudad de Nieva</option>
                   <option value="Alto Comedero">Alto Comedero</option>
                   <option value="Hattogu">Hattogu</option>
                 </select>
@@ -82,6 +83,11 @@
               <div class="field-group">
                 <label for="pedidosYaInput">PedidosYa</label>
                 <input type="text" id="pedidosYaInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
+
+              <div class="field-group" id="tiraxyInputGroup" style="display:none;">
+                <label for="tiraxyInput">Tiraxy</label>
+                <input type="text" id="tiraxyInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
               </div>
             </div>
 
