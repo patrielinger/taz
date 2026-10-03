@@ -1,56 +1,48 @@
 services:
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
-
     restart: unless-stopped
-
     depends_on:
       db:
         condition: service_healthy
-
+    env_file:
+      - .env
     environment:
+      NODE_ENV: production
       DB_HOST: db
       DB_PORT: 3306
-      DB_USER: root
-      DB_PASSWORD: password
-      DB_NAME: taz_admin
-      SESSION_SECRET: taz_super_secret
-      PORT: 3000
-
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_NAME: ${DB_NAME:-taz_admin}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me}
+      PORT: ${PORT:-3000}
     expose:
       - "3000"
-
     volumes:
+      - taz_data:/app/data
       - taz_uploads:/app/uploads
+    command: ["node", "server.js"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:${PORT:-3000}/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   db:
     image: mysql:8.0
-
     restart: unless-stopped
-
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: taz_admin
-      MYSQL_USER: tazuser
-      MYSQL_PASSWORD: password
-
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-password}
+      MYSQL_DATABASE: ${DB_NAME:-taz_admin}
+      MYSQL_USER: ${DB_USER:-tazuser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
     volumes:
       - mysql_data:/var/lib/mysql
-
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-uroot",
-          "-ppassword"
-        ]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD:-password}"]
       interval: 5s
       timeout: 10s
       retries: 20
@@ -58,4 +50,5 @@ services:
 
 volumes:
   mysql_data:
+  taz_data:
   taz_uploads:

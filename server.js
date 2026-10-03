@@ -1,4 +1,3 @@
-javascript
 const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
@@ -12,93 +11,88 @@ const cors = require('cors');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+const PUBLIC_ROOT = __dirname;
+const ADMIN_ROOT = path.join(__dirname, 'admin');
+const PUBLIC_HOSTS = new Set(['tazjujuy.com', 'www.tazjujuy.com', 'localhost']);
+const ADMIN_HOSTS = new Set(['admin.tazjujuy.com', 'www.admin.tazjujuy.com', 'admin.localhost']);
+const SESSION_COOKIE_SECURE = process.env.SESSION_SECURE === 'true' || process.env.NODE_ENV === 'production';
 
+app.set('trust proxy', 1);
 
 /* =========================================================
    MIDDLEWARES GENERALES
    ========================================================= */
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    const allowed = [
+      'https://tazjujuy.com',
+      'https://www.tazjujuy.com',
+      'https://admin.tazjujuy.com',
+      'https://www.admin.tazjujuy.com',
+      'http://localhost',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1'
+    ];
+
+    if (allowed.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-
-/* =========================================================
-   CONTROL DE ACCESO AL PANEL ADMIN
-   ========================================================= */
-
-// El panel /admin SOLO puede utilizarse desde:
-// https://admin.tazjujuy.com
-//
-// Si alguien intenta acceder a:
-// https://tazjujuy.com/admin
-// https://tazjujuy.com/admin/
-// https://tazjujuy.com/admin/index.html
-//
-// recibirá HTTP 404.
-
 app.use((req, res, next) => {
-  const host = req.hostname.toLowerCase();
+  const host = (req.hostname || '').toLowerCase();
+  const isAdminHost = ADMIN_HOSTS.has(host);
+  const isPublicHost = PUBLIC_HOSTS.has(host) || host.endsWith('.local');
 
-  // -------------------------------------------------------
-  // SUBDOMINIO ADMIN
-  // -------------------------------------------------------
-  if (host === 'admin.tazjujuy.com') {
-
-    // Si entramos directamente al subdominio:
-    // admin.tazjujuy.com
-    //
-    // internamente servimos:
-    // /admin/
-    if (req.path === '/') {
-      req.url = '/admin/';
+  if (isAdminHost) {
+    if (req.path === '/api' || req.path.startsWith('/api/')) {
+      return next();
     }
 
-    // Si entramos al subdominio con otra ruta que todavía
-    // no comienza con /admin, la agregamos.
-    //
-    // Ejemplo:
-    // admin.tazjujuy.com/login.html
-    //
-    // pasa internamente a:
-    // /admin/login.html
-    else if (!req.path.startsWith('/admin')) {
-      req.url = '/admin' + req.url;
+    const adminPath = req.path === '/' || req.path === '' ? 'index.html' : req.path.replace(/^\/+/, '');
+    const safePath = adminPath === 'admin' ? 'index.html' : adminPath;
+    const candidate = path.join(ADMIN_ROOT, safePath);
+
+    if (safePath && safePath !== 'index.html' && !safePath.startsWith('api/') && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return res.sendFile(candidate);
     }
 
-    return next();
+    return res.sendFile(path.join(ADMIN_ROOT, 'index.html'));
   }
 
+  if (isPublicHost && (req.path === '/admin' || req.path.startsWith('/admin/'))) {
+    const targetPath = req.path === '/admin' ? '/' : req.path.replace(/^\/admin/, '');
+    const target = `https://admin.tazjujuy.com${targetPath || '/'}`;
+    return res.redirect(301, target);
+  }
 
-  // -------------------------------------------------------
-  // DOMINIO PÚBLICO
-  // -------------------------------------------------------
-  //
-  // Cualquier intento de acceder a /admin desde el dominio
-  // público queda bloqueado.
-
-  if (
-    req.path === '/admin' ||
-    req.path.startsWith('/admin/')
-  ) {
-    return res.sendStatus(404);
+  if (host && !isPublicHost && !isAdminHost) {
+    return next();
   }
 
   next();
 });
 
-
 /* =========================================================
    ARCHIVOS ESTÁTICOS
    ========================================================= */
 
-// Sitio público
-app.use(express.static(path.join(__dirname)));
-
-// Archivos subidos por usuarios
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
+app.use(express.static(PUBLIC_ROOT, { index: false }));
 
 /* =========================================================
    SESIONES
@@ -108,9 +102,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'taz-secret',
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
     httpOnly: true,
-    secure: false,
+    secure: SESSION_COOKIE_SECURE,
     maxAge: 1000 * 60 * 60 * 8,
     sameSite: 'lax'
   }
@@ -205,10 +200,10 @@ const upload = multer({
    ========================================================= */
 
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'db',
   port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+  password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_NAME || 'taz_admin'
 };
 
@@ -1995,32 +1990,32 @@ app.get(
    RUTAS FINALES
    ========================================================= */
 
-// IMPORTANTE:
-//
-// Ya NO existe aquí ninguna regla que redirija /admin.
-// El control de acceso se hace al principio del archivo.
-//
-// Si alguien intenta acceder a /admin desde el dominio
-// público, ya recibió 404 antes de llegar aquí.
+app.get('/', (req, res) => {
+  res.sendFile(path.join(PUBLIC_ROOT, 'index.html'));
+});
+
+app.get('/admin', (req, res) => {
+  return res.redirect(301, 'https://admin.tazjujuy.com/');
+});
+
+app.get('/admin/*', (req, res) => {
+  const target = `https://admin.tazjujuy.com${req.path.replace(/^\/admin/, '') || '/'}`;
+  return res.redirect(301, target);
+});
 
 app.get('*', (req, res) => {
-
-  if (
-    req.path === '/admin' ||
-    req.path.startsWith('/admin/')
-  ) {
-
-    return res.sendStatus(404);
+  if (req.path === '/admin' || req.path.startsWith('/admin/')) {
+    return res.redirect(301, `https://admin.tazjujuy.com${req.path.replace(/^\/admin/, '') || '/'}`);
   }
 
+  const requested = req.path.replace(/^\/+/, '');
+  const candidate = path.join(PUBLIC_ROOT, requested);
 
-  res.sendFile(
-    path.join(
-      __dirname,
-      'index.html'
-    )
-  );
+  if (requested && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+    return res.sendFile(candidate);
+  }
 
+  res.sendFile(path.join(PUBLIC_ROOT, 'index.html'));
 });
 
 
@@ -2028,10 +2023,6 @@ app.get('*', (req, res) => {
    SERVIDOR
    ========================================================= */
 
-app.listen(PORT, () => {
-
-  console.log(
-    `Servidor activo en http://localhost:${PORT}`
-  );
-
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor activo en http://0.0.0.0:${PORT}`);
 });
