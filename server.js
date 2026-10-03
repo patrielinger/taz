@@ -122,6 +122,7 @@ async function initDatabase() {
       transferencias DECIMAL(12,2) NOT NULL DEFAULT 0,
       qr DECIMAL(12,2) NOT NULL DEFAULT 0,
       pedidos_ya DECIMAL(12,2) NOT NULL DEFAULT 0,
+      tiraxy DECIMAL(12,2) NOT NULL DEFAULT 0,
       total DECIMAL(12,2) NOT NULL DEFAULT 0,
       notas TEXT,
       stock TEXT,
@@ -172,7 +173,7 @@ async function initDatabase() {
     console.warn('Could not ensure password_hash column exists:', err.message || err);
   }
 
-  // Ensure records table has pedidos_ya and stock columns for older DBs
+  // Ensure records table has pedidos_ya, tiraxy, and stock columns for older DBs
   try {
     const [pedRows] = await pool.execute(
       `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'records' AND COLUMN_NAME = 'pedidos_ya'`,
@@ -180,6 +181,14 @@ async function initDatabase() {
     );
     if (!pedRows || !pedRows[0] || Number(pedRows[0].cnt) === 0) {
       await pool.execute(`ALTER TABLE records ADD COLUMN pedidos_ya DECIMAL(12,2) NOT NULL DEFAULT 0`);
+    }
+
+    const [tiraxyRows] = await pool.execute(
+      `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'records' AND COLUMN_NAME = 'tiraxy'`,
+      [dbConfig.database]
+    );
+    if (!tiraxyRows || !tiraxyRows[0] || Number(tiraxyRows[0].cnt) === 0) {
+      await pool.execute(`ALTER TABLE records ADD COLUMN tiraxy DECIMAL(12,2) NOT NULL DEFAULT 0`);
     }
 
     const [stockRows] = await pool.execute(
@@ -339,19 +348,20 @@ app.post('/api/records', ensureAuth, async (req, res) => {
     transferencias: Number(transferencias || 0),
     qr: Number(qr || 0),
     pedidosYa: Number(req.body.pedidosYa || req.body.pedidos_ya || 0),
+    tiraxy: Number(req.body.tiraxy || 0),
     stock: req.body.stock || ''
   };
 
-  const total = cleanAmounts.efectivo + cleanAmounts.transferencias + cleanAmounts.qr + cleanAmounts.pedidosYa;
+  const total = cleanAmounts.efectivo + cleanAmounts.transferencias + cleanAmounts.qr + cleanAmounts.pedidosYa + cleanAmounts.tiraxy;
   const fullName = [req.session.user?.name, req.session.user?.lastName].filter(Boolean).join(' ').trim();
   const usuario = fullName || req.session.user?.username || 'Sin usuario';
   const now = new Date();
   const hora = now.toLocaleTimeString('es-AR', { hour12: false });
 
   const [result] = await pool.execute(
-    `INSERT INTO records (fecha, sucursal, efectivo, transferencias, qr, pedidos_ya, total, notas, stock, usuario)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [fecha, sucursal, cleanAmounts.efectivo, cleanAmounts.transferencias, cleanAmounts.qr, cleanAmounts.pedidosYa, total, notas || '', cleanAmounts.stock, usuario]
+    `INSERT INTO records (fecha, sucursal, efectivo, transferencias, qr, pedidos_ya, tiraxy, total, notas, stock, usuario)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [fecha, sucursal, cleanAmounts.efectivo, cleanAmounts.transferencias, cleanAmounts.qr, cleanAmounts.pedidosYa, cleanAmounts.tiraxy, total, notas || '', cleanAmounts.stock, usuario]
   );
 
   try {
@@ -367,6 +377,7 @@ app.post('/api/records', ensureAuth, async (req, res) => {
       transferencias: cleanAmounts.transferencias,
       qr: cleanAmounts.qr,
       pedidosYa: cleanAmounts.pedidosYa,
+      tiraxy: cleanAmounts.tiraxy,
       notas: notas || '',
       stock: cleanAmounts.stock || '',
       total,
@@ -392,20 +403,24 @@ app.get('/api/records/json', ensureAuth, async (req, res) => {
 
 app.put('/api/records/:id', ensureAuth, ensureAdmin, async (req, res) => {
   const { id } = req.params;
-  const { fecha, sucursal, efectivo, transferencias, qr, pedidosYa, notas, stock } = req.body;
+  const { fecha, sucursal, efectivo, transferencias, qr, pedidosYa, tiraxy, notas, stock } = req.body;
+
+  const tiraxyValue = Number(tiraxy || 0);
+  const pedidosValue = Number(pedidosYa || 0);
+  const totalValue = Number((Number(efectivo || 0) + Number(transferencias || 0) + Number(qr || 0) + pedidosValue + tiraxyValue).toFixed(2));
 
   await pool.execute(
-    `UPDATE records SET fecha = ?, sucursal = ?, efectivo = ?, transferencias = ?, qr = ?, pedidos_ya = ?, total = ?, notas = ?, stock = ? WHERE id = ?`,
-    [fecha, sucursal, Number(efectivo || 0), Number(transferencias || 0), Number(qr || 0), Number(pedidosYa || 0), Number((Number(efectivo || 0) + Number(transferencias || 0) + Number(qr || 0) + Number(pedidosYa || 0))).toFixed(2), notas || '', stock || '', id]
+    `UPDATE records SET fecha = ?, sucursal = ?, efectivo = ?, transferencias = ?, qr = ?, pedidos_ya = ?, tiraxy = ?, total = ?, notas = ?, stock = ? WHERE id = ?`,
+    [fecha, sucursal, Number(efectivo || 0), Number(transferencias || 0), Number(qr || 0), pedidosValue, tiraxyValue, totalValue, notas || '', stock || '', id]
   );
 
   // update JSON copy
   try {
     const recs = await readJsonFile('records.json');
     const idx = recs.findIndex((r) => String(r.id) === String(id));
-    const total = Number(efectivo || 0) + Number(transferencias || 0) + Number(qr || 0) + Number(pedidosYa || 0);
+    const total = Number(efectivo || 0) + Number(transferencias || 0) + Number(qr || 0) + Number(pedidosYa || 0) + Number(tiraxy || 0);
     if (idx !== -1) {
-      recs[idx] = { ...recs[idx], fecha, sucursal, efectivo: Number(efectivo || 0), transferencias: Number(transferencias || 0), qr: Number(qr || 0), pedidosYa: Number(pedidosYa || 0), total, notas: notas || '', stock: stock || '' };
+      recs[idx] = { ...recs[idx], fecha, sucursal, efectivo: Number(efectivo || 0), transferencias: Number(transferencias || 0), qr: Number(qr || 0), pedidosYa: Number(pedidosYa || 0), tiraxy: Number(tiraxy || 0), total, notas: notas || '', stock: stock || '' };
       await writeJsonFile('records.json', recs);
     }
   } catch (err) {

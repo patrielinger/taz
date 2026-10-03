@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TAZ — Menú completo</title>
-<link rel="shortcut icon" href="img/logo-red.svg" />
+  <title>TAZ — Menú vertical</title>
+  <link rel="shortcut icon" href="img/logo-red.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="header">
-    <a class="logo" href="index.html"><img src="img/logo.svg" alt="TAZ" loading="eager" fetchpriority="high"></a>
+    <a class="logo" href="index.html"><img src="img/logo.svg" alt="TAZ" loading="eager"></a>
     <button class="menu" id="menu">☰</button>
     <nav class="nav" id="nav">
       <a href="index.html#inicio">Inicio</a>
@@ -24,6 +24,8 @@
     </nav>
   </header>
 
+
+
   <main class="menu-page">
     <header class="menu-header">
       <span class="red">TAZ · JUJUY</span>
@@ -33,7 +35,8 @@
     </header>
 
     <div class="branch-menu-selector" id="branchMenuSelector" aria-label="Seleccionar sucursal"></div>
-    <div id="menuContent" class="menu-content" aria-live="polite"></div>
+    <div id="categoryNav" class="category-nav" aria-label="Categorías"></div>
+    <div id="menuContent" class="menu-vertical" aria-live="polite"></div>
   </main>
 
   <button class="cart-fab" id="cartToggle" type="button" aria-label="Abrir carrito">
@@ -60,5 +63,6 @@
   </aside>
 
   <script src="script.js"></script>
+  <script src="menu_vertical.js"></script>
 </body>
 </html>
