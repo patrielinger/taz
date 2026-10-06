@@ -65,79 +65,79 @@ const baseMenu = [
   {
     title: 'Hamburguesas',
     items: [
-      { name: 'Hamburguesa Especial', price: 11500, description: 'Lechuga, tomate, huevo, jamon, queso, carne.', photo: '', available: true },
-      { name: 'Big Taz', price: 14000, description: 'Lechuga, tomate, huevo, jamon, queso, doble carne.', photo: '', available: true },
-      { name: 'Gran Unnie', price: 14000, description: 'Cuádruple hamburguesa, triple queso, lechuga, tomate + Papas.', photo: '', available: true },
-      { name: 'Patinesa', price: 11500, description: 'Hamburguesa rebosada, lechuga, tomate, huevo, jamón, queso.', photo: '', available: true }
+      { name: 'Hamburguesa Especial', price: 11500, description: 'Lechuga, tomate, huevo, jamon, queso, carne.', photo: '/img/menu/HE.png', available: true },
+      { name: 'Big Taz', price: 14000, description: 'Lechuga, tomate, huevo, jamon, queso, doble carne.', photo: '/img/menu/BigTaz.png', available: true },
+      { name: 'Gran Unnie', price: 14000, description: 'Cuádruple hamburguesa, triple queso, lechuga, tomate + Papas.', photo: '/img/menu', available: true },
+      { name: 'Patinesa', price: 11500, description: 'Hamburguesa rebosada, lechuga, tomate, huevo, jamón, queso.', photo: '/img/menu/paty.png', available: true }
     ]
   },
   {
     title: 'Sandwiches',
     items: [
-      { name: 'Lomito Especial', price: 12000, description: 'Lechuga, tomate, huevo, jamon, queso, lomito.', photo: '', available: true },
-      { name: 'Mega Lomo', price: 16000, description: 'Lechuga, tomate, huevo, jamon, queso, doble lomo.', photo: '', available: true },
-      { name: 'Lomito Taz Loco', price: 13000, description: 'Tomate, huevo, 2 tipos de queso, morron, aceituna.', photo: '', available: true },
-      { name: 'Lomito de Cerdo', price: 10000, description: 'Lechuga, tomate, huevo, jamon, queso, cerdo.', photo: '', available: true },
-      { name: 'Mila Especial', price: 12000, description: 'Lechuga, tomate, huevo, jamon, queso, milanesa.', photo: '', available: true },
-      { name: 'Mega Mila', price: 16000, description: 'Lechuga, tomate, huevo, jamon, queso, doble milanesa.', photo: '', available: true },
-      { name: 'Sandwich Vegetariano', price: 8000, description: 'Lechuga, tomate, 2 tipos de queso, huevo, morron, aceituna.', photo: '', available: true }
+      { name: 'Lomito Especial', price: 12000, description: 'Lechuga, tomate, huevo, jamon, queso, lomito.', photo: '/img/menu/le.png', available: true },
+      { name: 'Mega Lomo', price: 16000, description: 'Lechuga, tomate, huevo, jamon, queso, doble lomo.', photo: '/img/menu', available: true },
+      { name: 'Lomito Taz Loco', price: 13000, description: 'Tomate, huevo, 2 tipos de queso, morron, aceituna.', photo: '/img/menu/tazloco.png', available: true },
+      { name: 'Lomito de Cerdo', price: 10000, description: 'Lechuga, tomate, huevo, jamon, queso, cerdo.', photo: '/img/menu', available: true },
+      { name: 'Mila Especial', price: 12000, description: 'Lechuga, tomate, huevo, jamon, queso, milanesa.', photo: '/img/menu/ME.png', available: true },
+      { name: 'Mega Mila', price: 16000, description: 'Lechuga, tomate, huevo, jamon, queso, doble milanesa.', photo: '/img/menu/MegaMila.png', available: true },
+      { name: 'Sandwich Vegetariano', price: 8000, description: 'Lechuga, tomate, 2 tipos de queso, huevo, morron, aceituna.', photo: '/img/menu', available: true }
     ]
   },
   {
     title: 'Extras',
     items: [
-      { name: 'Napolitana', price: 13500, description: 'Milanesa napolitana + papas fritas', photo: '', available: true },
-      { name: 'Promo Kids', price: 12500, description: 'Cajita infantil con 1 hamburguesa o nuggets + Papas + jugo Baggio + juguete a elección.', photo: '', available: true },
-      { name: 'Charles', price: 21000, description: 'Tomate, huevo, jamon, queso, carne, pan de miga.', photo: '', available: true },
-      { name: 'Pancho', price: 4000, description: '', photo: '', available: true }
+      { name: 'Napolitana', price: 13500, description: 'Milanesa napolitana + papas fritas', photo: '/img/menu/napo.png', available: true },
+      { name: 'Promo Kids', price: 12500, description: 'Cajita infantil con 1 hamburguesa o nuggets + Papas + jugo Baggio + juguete a elección.', photo: '/img/menu/promokids.png', available: true },
+      { name: 'Charles', price: 21000, description: 'Tomate, huevo, jamon, queso, carne, pan de miga.', photo: '/img/menu', available: true },
+      { name: 'Pancho', price: 4000, description: '', photo: '/img/menu', available: true }
     ]
   },
   {
     title: 'Papas',
     items: [
-      { name: 'Adicional de papas', price: 1500, description: '', photo: '', available: true },
-      { name: 'Papas fritas grande', price: 9000, description: '', photo: '', available: true },
-      { name: 'Papas Moon', price: 11500, description: 'Papas grandes bañadas en chedar, huevo, jamon y aceitunas', photo: '', available: true }
+      { name: 'Adicional de papas', price: 1500, description: '', photo: '/img/menu', available: true },
+      { name: 'Papas fritas grande', price: 9000, description: '', photo: '/img/menu', available: true },
+      { name: 'Papas Moon', price: 11500, description: 'Papas grandes bañadas en chedar, huevo, jamon y aceitunas', photo: '/img/menu', available: true }
     ]
   },
   {
     title: 'Postres',
     items: [
-      { name: 'Taz Shake de Dulce de Leche', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '', available: false },
-      { name: 'Taz Shake de Oreo', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '', available: false },
-      { name: 'Taz Shake de Frutilla', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '', available: false }
+      { name: 'Taz Shake de Dulce de Leche', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '/img/menu', available: false },
+      { name: 'Taz Shake de Oreo', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '/img/menu', available: false },
+      { name: 'Taz Shake de Frutilla', price: 5000, description: 'Suave, cremoso y con un dulzor clásico.', photo: '/img/menu', available: false }
     ]
   },
   {
     title: 'Bebidas - Exclusivo linea Coca-Cola',
     items: [
-      { name: 'Agua mineral', price: 2200, description: '', photo: '', available: true },
-      { name: 'Gaseosa 375ml', price: 3000, description: '', photo: '', available: true },
-      { name: 'Gaseosa 500ml', price: 4000, description: 'Gaseosas y Aguas saborisadas', photo: '', available: true },
-      { name: 'Gaseosa 1L', price: 6000, description: '', photo: '', available: true },
-      { name: 'Gaseosa 1.5L', price: 8000, description: '', photo: '', available: true },
-      { name: 'Jugo de naranja', price: 3800, description: 'Vaso de jugo de naranja', photo: '', available: true }
+      { name: 'Agua mineral', price: 2200, description: '', photo: '/img/menu', available: true },
+      { name: 'Gaseosa 375ml', price: 3000, description: '', photo: '/img/menu', available: true },
+      { name: 'Gaseosa 500ml', price: 4000, description: 'Gaseosas y Aguas saborisadas', photo: '/img/menu', available: true },
+      { name: 'Gaseosa 1L', price: 6000, description: '', photo: '/img/menu', available: true },
+      { name: 'Gaseosa 1.5L', price: 8000, description: '', photo: '/img/menu', available: true },
+      { name: 'Jugo de naranja', price: 3800, description: 'Vaso de jugo de naranja', photo: '/img/menu', available: true }
     ]
   },
   {
     title: 'Cervezas y Aperitivos',
     items: [
-      { name: 'Artesanal 1L', price: 6500, description: 'Sabor miel, rubia y negra', photo: '', available: true },
-      { name: 'Corona 710ml', price: 8000, description: '', photo: '', available: true },
-      { name: 'Lata de cerveza 473ml', price: 3900, description: '', photo: '', available: true },
-      { name: 'Fernet', price: 4800, description: '', photo: '', available: false },
-      { name: 'Gancia + Sprite', price: 4800, description: '', photo: '', available: false },
-      { name: 'Campari + Jugo de naranja', price: 4800, description: '', photo: '', available: false }
+      { name: 'Artesanal 1L', price: 6500, description: 'Sabor miel, rubia y negra', photo: '/img/menu', available: true },
+      { name: 'Corona 710ml', price: 8000, description: '', photo: '/img/menu', available: true },
+      { name: 'Lata de cerveza 473ml', price: 3900, description: '', photo: '/img/menu', available: true },
+      { name: 'Fernet', price: 4800, description: '', photo: '/img/menu', available: false },
+      { name: 'Gancia + Sprite', price: 4800, description: '', photo: '/img/menu', available: false },
+      { name: 'Campari + Jugo de naranja', price: 4800, description: '', photo: '/img/menu', available: false }
     ]
   },
   {
     title: 'Tragos',
     items: [
-      { name: 'Sex on the beach', price: 6900, description: '', photo: '', available: false },
-      { name: 'Laguna azul', price: 6900, description: '', photo: '', available: false },
-      { name: 'Margarita', price: 6900, description: '', photo: '', available: false },
-      { name: 'Gin Tonic', price: 8500, description: '', photo: '', available: false },
-      { name: 'Caipiroska', price: 6900, description: '', photo: '', available: false }
+      { name: 'Sex on the beach', price: 6900, description: '', photo: '/img/menu', available: false },
+      { name: 'Laguna azul', price: 6900, description: '', photo: '/img/menu', available: false },
+      { name: 'Margarita', price: 6900, description: '', photo: '/img/menu', available: false },
+      { name: 'Gin Tonic', price: 8500, description: '', photo: '/img/menu', available: false },
+      { name: 'Caipiroska', price: 6900, description: '', photo: '/img/menu', available: false }
     ]
   }
 ];
