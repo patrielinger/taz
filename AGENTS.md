@@ -52,6 +52,13 @@ npm run dev
 - Do not remove the JSON persistence layer without checking whether the app intentionally relies on it for local reads or fallback data.
 - If auth, login, or session behavior changes, validate the browser flow end-to-end instead of only checking the backend code.
 - Keep `fetch` calls aligned with the app's session-cookie behavior: protected API calls should use `credentials: 'include'`.
+- For public pages and menu flows, prioritize mobile-first responsive layouts: keep menu filters horizontally scrollable, let item rows wrap instead of imposing fixed widths, and verify the viewport at 360-390px before shipping changes.
+
+## Responsive UI conventions
+
+- Small-screen work should be done in the shared stylesheet rather than inline styles in [menu.html](menu.html) unless the layout truly needs a one-off exception.
+- When editing menu cards, avoid fixed-width thumbnails, rigid row spacing, or unwrapped price/button groups that can overflow on narrow devices.
+- Check the vertical menu flow on [menu.html](menu.html) for: sticky category nav, branch selector wrapping, and product rows that stack cleanly without horizontal scrolling.
 
 ## Validation checklist
 
