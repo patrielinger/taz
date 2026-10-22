@@ -151,6 +151,13 @@ function formatDateInput(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatDisplayDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(date);
+}
+
 function setDefaultDate() {
   const today = new Date();
   const todayStr = formatDateInput(today);
@@ -258,7 +265,7 @@ function renderRecords(records) {
   table.innerHTML = filteredRecords.map((record) => `
     <tr>
       <td>${record.sucursal}</td>
-      <td>${record.fecha}</td>
+      <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora}</td>
       <td>${record.usuario}</td>
       <td>${money(record.efectivo)}</td>
@@ -300,7 +307,7 @@ function renderLastRecord(records) {
 
   panel.style.display = 'block';
   content.innerHTML = `
-    <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${latest.fecha} ${latest.hora}</div>
+    <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${formatDisplayDate(latest.fecha)} ${latest.hora}</div>
     <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)} — Tiraxy: ${money(latest.tiraxy || 0)}</div>
     <div>Total: ${money(latest.total)}</div>
     <div>Notas: ${latest.notas || '—'}</div>
@@ -570,7 +577,7 @@ async function renderRecordsByDate(date) {
 
       setupModal().show({
         title: 'Eliminar ingreso',
-        body: `<p>¿Eliminar el registro de ${r.sucursal} del ${r.fecha}?</p>`,
+        body: `<p>¿Eliminar el registro de ${r.sucursal} del ${formatDisplayDate(r.fecha)}?</p>`,
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',
         showCancel: true,
@@ -825,9 +832,7 @@ function getActiveAnalyticsRange() {
 
 function formatReportDate(value) {
   if (!value) return '—';
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  return formatDisplayDate(value);
 }
 
 function formatReportDateTime(value) {
@@ -1280,7 +1285,7 @@ async function renderAnalytics() {
 
   table.innerHTML = selectedRecords.map((record) => `
     <tr data-id="${record.id}">
-      <td>${record.fecha}</td>
+      <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora || '—'}</td>
       <td>${normalizeBranchName(record.sucursal)}</td>
       <td>${record.usuario}</td>
@@ -1334,7 +1339,7 @@ async function renderAnalytics() {
 
       setupModal().show({
         title: 'Eliminar ingreso',
-        body: `<p>¿Eliminar el registro de ${normalizeBranchName(record.sucursal)} del ${record.fecha}?</p>`,
+        body: `<p>¿Eliminar el registro de ${normalizeBranchName(record.sucursal)} del ${formatDisplayDate(record.fecha)}?</p>`,
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',
         showCancel: true,
