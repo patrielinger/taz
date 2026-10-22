@@ -193,7 +193,8 @@ function renderBranchSummary(records) {
       efectivo: filtered.reduce((sum, item) => sum + Number(item.efectivo || 0), 0),
       transferencias: filtered.reduce((sum, item) => sum + Number(item.transferencias || 0), 0),
       qr: filtered.reduce((sum, item) => sum + Number(item.qr || 0), 0),
-      pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || 0), 0),
+      pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || item.pedidos_ya || 0), 0),
+      tiraxy: filtered.reduce((sum, item) => sum + Number(item.tiraxy || 0), 0),
       total: filtered.reduce((sum, item) => sum + Number(item.total || 0), 0)
     };
   });
@@ -205,6 +206,7 @@ function renderBranchSummary(records) {
       <td>${money(item.transferencias)}</td>
       <td>${money(item.qr)}</td>
       <td>${money(item.pedidosYa)}</td>
+      <td>${money(item.tiraxy || 0)}</td>
       <td>${money(item.total)}</td>
     </tr>
   `).join('');
@@ -247,7 +249,7 @@ function renderRecords(records) {
   if (!filteredRecords.length) {
     table.innerHTML = `
         <tr>
-          <td colspan="11">No hay ingresos cargados para esta fecha.</td>
+          <td colspan="12">No hay ingresos cargados para esta fecha.</td>
         </tr>
     `;
     return;
@@ -263,6 +265,7 @@ function renderRecords(records) {
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
@@ -298,7 +301,7 @@ function renderLastRecord(records) {
   panel.style.display = 'block';
   content.innerHTML = `
     <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${latest.fecha} ${latest.hora}</div>
-    <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)}</div>
+    <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)} — Tiraxy: ${money(latest.tiraxy || 0)}</div>
     <div>Total: ${money(latest.total)}</div>
     <div>Notas: ${latest.notas || '—'}</div>
     <div>Stock: ${latest.stock || '—'}</div>
@@ -447,6 +450,10 @@ function openRecordEditor(record, onSave) {
           <label for="editRecordPedidosYa">PedidosYa</label>
           <input id="editRecordPedidosYa" type="text" inputmode="numeric" value="${Number(record.pedidosYa ?? record.pedidos_ya ?? 0)}">
         </div>
+        <div class="field-group" id="editRecordTiraxyGroup" ${record.sucursal === 'Alvear' || record.sucursal === 'Centro' ? '' : 'style="display:none;"'}>
+          <label for="editRecordTiraxy">Tiraxy</label>
+          <input id="editRecordTiraxy" type="text" inputmode="numeric" value="${Number(record.tiraxy || 0)}">
+        </div>
       </div>
       <div class="field-row notes-stock-grid">
         <div class="field-group">
@@ -460,6 +467,23 @@ function openRecordEditor(record, onSave) {
       </div>
     </form>
   `;
+
+  const branchField = document.getElementById('editRecordBranch');
+  const tiraxyFieldGroup = document.getElementById('editRecordTiraxyGroup');
+  const tiraxyField = document.getElementById('editRecordTiraxy');
+
+  const syncEditorTiraxyVisibility = () => {
+    const shouldShow = branchField?.value === 'Alvear';
+    if (tiraxyFieldGroup) {
+      tiraxyFieldGroup.style.display = shouldShow ? 'block' : 'none';
+    }
+    if (!shouldShow && tiraxyField) {
+      tiraxyField.value = '0';
+    }
+  };
+
+  branchField?.addEventListener('change', syncEditorTiraxyVisibility);
+  syncEditorTiraxyVisibility();
 
   modal.show({
     title: 'Editar ingreso',
@@ -478,6 +502,7 @@ function openRecordEditor(record, onSave) {
         transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
         qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
         pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
+        tiraxy: Number(sanitizeNumber(document.getElementById('editRecordTiraxy')?.value || 0)),
         notas: document.getElementById('editRecordNotes').value.trim(),
         stock: document.getElementById('editRecordStock').value.trim(),
       };
@@ -494,7 +519,7 @@ async function renderRecordsByDate(date) {
   const filtered = records.filter((r) => r.fecha === date).sort((a, b) => String(a.hora).localeCompare(b.hora));
 
   if (!filtered.length) {
-    table.innerHTML = '<tr><td colspan="11">No hay registros para la fecha seleccionada.</td></tr>';
+    table.innerHTML = '<tr><td colspan="12">No hay registros para la fecha seleccionada.</td></tr>';
     return;
   }
 
@@ -509,6 +534,7 @@ async function renderRecordsByDate(date) {
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
@@ -526,7 +552,7 @@ async function renderRecordsByDate(date) {
         try {
           await fetchJson(`/api/records/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({ fecha: payload.fecha || r.fecha, sucursal: payload.sucursal || r.sucursal, efectivo: payload.efectivo, transferencias: payload.transferencias, qr: payload.qr, pedidosYa: payload.pedidosYa, notas: payload.notas, stock: payload.stock })
+            body: JSON.stringify({ fecha: payload.fecha || r.fecha, sucursal: payload.sucursal || r.sucursal, efectivo: payload.efectivo, transferencias: payload.transferencias, qr: payload.qr, pedidosYa: payload.pedidosYa, tiraxy: payload.tiraxy, notas: payload.notas, stock: payload.stock })
           });
           await renderRecordsByDate(date);
           await renderDashboard();
@@ -1248,7 +1274,7 @@ async function renderAnalytics() {
   const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
 
   if (!selectedRecords.length) {
-    table.innerHTML = `<tr><td colspan="${isAdmin ? 12 : 11}">No hay registros para el rango seleccionado.</td></tr>`;
+    table.innerHTML = `<tr><td colspan="${isAdmin ? 13 : 12}">No hay registros para el rango seleccionado.</td></tr>`;
     return;
   }
 
@@ -1262,6 +1288,7 @@ async function renderAnalytics() {
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
@@ -1286,6 +1313,7 @@ async function renderAnalytics() {
               transferencias: payload.transferencias,
               qr: payload.qr,
               pedidosYa: payload.pedidosYa,
+              tiraxy: payload.tiraxy,
               notas: payload.notas,
               stock: payload.stock,
             })
