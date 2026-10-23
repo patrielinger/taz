@@ -1024,15 +1024,12 @@ app.put(
       efectivo,
       transferencias,
       qr,
+      pedidosYa,
+      tiraxy,
       notas,
       stock
     } = req.body;
 
-    const pedidosYa =
-      req.body.pedidosYa ?? req.body.pedidos_ya ?? 0;
-
-    const tiraxy =
-      req.body.tiraxy ?? 0;
 
     const tiraxyValue =
       Number(tiraxy || 0);

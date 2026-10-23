@@ -27,13 +27,6 @@ npm install
 npm run dev
 ```
 
-## AI agent workflow
-
-- Start by checking [server.js](server.js) and [nodemon.json](nodemon.json) before changing request handling, auth, or file-write flows.
-- Keep changes scoped to the relevant view or API route; the app mixes static public pages, admin pages, and session-protected APIs in one codebase.
-- When modifying persisted data, update both the MySQL logic and the JSON sync layer under [data/](data/) so the app does not drift between storage backends.
-- When a task touches uploads, sessions, or login flow, verify the browser still sends `credentials: 'include'` and that the server does not trigger restart loops by writing into watched folders.
-
 ## Architecture and conventions
 
 - [server.js](server.js) bootstraps Express, session auth, file uploads, and the MySQL connection lifecycle.
