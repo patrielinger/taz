@@ -329,23 +329,18 @@ function renderRecords(records) {
       if (!record) return;
 
       openRecordEditor(record, async (payload) => {
-        try {
-          await persistRecordUpdate(id, {
-            fecha: payload.fecha || record.fecha,
-            sucursal: payload.sucursal || record.sucursal,
-            efectivo: payload.efectivo,
-            transferencias: payload.transferencias,
-            qr: payload.qr,
-            pedidosYa: payload.pedidosYa,
-            tiraxy: payload.tiraxy,
-            notas: payload.notas,
-            stock: payload.stock
-          });
-          await renderDashboard();
-          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
-        } catch (err) {
-          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
-        }
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || record.fecha,
+          sucursal: payload.sucursal || record.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock
+        });
+        await renderDashboard();
       });
     }));
 
@@ -593,21 +588,28 @@ function openRecordEditor(record, onSave) {
     cancelText: 'Cancelar',
     showCancel: true,
     allowBackdropClose: true,
-    onConfirm: () => {
+    onConfirm: async () => {
       const form = document.getElementById('recordEditForm');
       if (!form) return;
-      const payload = {
-        fecha: document.getElementById('editRecordDate').value,
-        sucursal: document.getElementById('editRecordBranch').value,
-        efectivo: Number(sanitizeNumber(document.getElementById('editRecordCash').value)),
-        transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
-        qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
-        pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
-        tiraxy: Number(sanitizeNumber(document.getElementById('editRecordTiraxy')?.value || 0)),
-        notas: document.getElementById('editRecordNotes').value.trim(),
-        stock: document.getElementById('editRecordStock').value.trim(),
-      };
-      onSave(payload);
+
+      try {
+        const payload = {
+          fecha: document.getElementById('editRecordDate').value,
+          sucursal: document.getElementById('editRecordBranch').value,
+          efectivo: Number(sanitizeNumber(document.getElementById('editRecordCash').value)),
+          transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
+          qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
+          pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
+          tiraxy: Number(sanitizeNumber(document.getElementById('editRecordTiraxy')?.value || 0)),
+          notas: document.getElementById('editRecordNotes').value.trim(),
+          stock: document.getElementById('editRecordStock').value.trim(),
+        };
+
+        await onSave(payload);
+        showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+      } catch (error) {
+        showNotice('No se pudo actualizar', error?.message || 'No se pudo actualizar el registro.', 'error');
+      }
     }
   });
 }
@@ -650,24 +652,19 @@ async function renderRecordsByDate(date) {
       if (!r) return;
 
       openRecordEditor(r, async (payload) => {
-        try {
-          await persistRecordUpdate(id, {
-            fecha: payload.fecha || r.fecha,
-            sucursal: payload.sucursal || r.sucursal,
-            efectivo: payload.efectivo,
-            transferencias: payload.transferencias,
-            qr: payload.qr,
-            pedidosYa: payload.pedidosYa,
-            tiraxy: payload.tiraxy,
-            notas: payload.notas,
-            stock: payload.stock
-          });
-          await renderRecordsByDate(date);
-          await renderDashboard();
-          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
-        } catch (err) {
-          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
-        }
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || r.fecha,
+          sucursal: payload.sucursal || r.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock
+        });
+        await renderRecordsByDate(date);
+        await renderDashboard();
       });
     }));
 
@@ -1409,24 +1406,19 @@ async function renderAnalytics() {
       if (!record) return;
 
       openRecordEditor(record, async (payload) => {
-        try {
-          await persistRecordUpdate(id, {
-            fecha: payload.fecha || record.fecha,
-            sucursal: payload.sucursal || record.sucursal,
-            efectivo: payload.efectivo,
-            transferencias: payload.transferencias,
-            qr: payload.qr,
-            pedidosYa: payload.pedidosYa,
-            tiraxy: payload.tiraxy,
-            notas: payload.notas,
-            stock: payload.stock,
-          });
-          await renderAnalytics();
-          await renderDashboard();
-          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
-        } catch (err) {
-          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
-        }
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || record.fecha,
+          sucursal: payload.sucursal || record.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock,
+        });
+        await renderAnalytics();
+        await renderDashboard();
       });
     }));
 
