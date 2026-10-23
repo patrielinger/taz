@@ -245,38 +245,40 @@ function renderBranchSummary(records) {
 }
 
 async function persistRecordUpdate(id, payload) {
+  const normalizedPayload = {
+    fecha: payload.fecha,
+    sucursal: payload.sucursal,
+    efectivo: Number(payload.efectivo || 0),
+    transferencias: Number(payload.transferencias || 0),
+    qr: Number(payload.qr || 0),
+    pedidosYa: Number(payload.pedidosYa ?? payload.pedidos_ya ?? 0),
+    tiraxy: Number(payload.tiraxy ?? 0),
+    notas: payload.notas || '',
+    stock: payload.stock || ''
+  };
+
   const response = await fetchJson(`/api/records/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      fecha: payload.fecha,
-      sucursal: payload.sucursal,
-      efectivo: payload.efectivo,
-      transferencias: payload.transferencias,
-      qr: payload.qr,
-      pedidosYa: payload.pedidosYa,
-      tiraxy: payload.tiraxy,
-      notas: payload.notas,
-      stock: payload.stock
-    })
+    body: JSON.stringify(normalizedPayload)
   });
 
-  const currentRecords = getStoredRecords();
+  const currentRecords = await loadRecords();
   const nextRecords = currentRecords.map((record) => {
     if (String(record.id) !== String(id)) return record;
 
-    const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
+    const total = Number(normalizedPayload.efectivo) + Number(normalizedPayload.transferencias) + Number(normalizedPayload.qr) + Number(normalizedPayload.pedidosYa) + Number(normalizedPayload.tiraxy);
 
     return {
       ...record,
-      fecha: payload.fecha || record.fecha,
-      sucursal: payload.sucursal || record.sucursal,
-      efectivo: Number(payload.efectivo || 0),
-      transferencias: Number(payload.transferencias || 0),
-      qr: Number(payload.qr || 0),
-      pedidosYa: Number(payload.pedidosYa || 0),
-      tiraxy: Number(payload.tiraxy || 0),
-      notas: payload.notas || '',
-      stock: payload.stock || '',
+      fecha: normalizedPayload.fecha || record.fecha,
+      sucursal: normalizedPayload.sucursal || record.sucursal,
+      efectivo: normalizedPayload.efectivo,
+      transferencias: normalizedPayload.transferencias,
+      qr: normalizedPayload.qr,
+      pedidosYa: normalizedPayload.pedidosYa,
+      tiraxy: normalizedPayload.tiraxy,
+      notas: normalizedPayload.notas,
+      stock: normalizedPayload.stock,
       total
     };
   });
@@ -1525,7 +1527,7 @@ async function renderEmployees() {
   `).join('');
 
   document.querySelectorAll('.edit-employee').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const employee = employees.find((item) => String(item.id) === String(button.dataset.id));
       if (!employee) return;
 
@@ -1550,6 +1552,12 @@ async function renderEmployees() {
       if (notesField) notesField.value = employee.notes || '';
       if (notesWrap) notesWrap.classList.remove('hidden');
       if (formTitle) formTitle.textContent = 'Editar empleado';
+
+      const roleFieldWatcher = document.getElementById('employeeRole');
+      const passWrap = document.querySelector('.employee-password-field');
+      if (roleFieldWatcher && passWrap) {
+        passWrap.classList.toggle('hidden', roleFieldWatcher.value !== 'Encargado');
+      }
 
       toggleSection('employees');
       if (nameField) nameField.focus();
@@ -1610,7 +1618,8 @@ function initEmployeeForm() {
     event.preventDefault();
 
     const idField = document.getElementById('employeeId');
-    const existingEmployee = getStoredEmployees().find((item) => String(item.id) === String(idField?.value || ''));
+    const employeeStore = await getEmployees();
+    const existingEmployee = employeeStore.find((item) => String(item.id) === String(idField?.value || '')) || getStoredEmployees().find((item) => String(item.id) === String(idField?.value || ''));
     const payload = {
       name: document.getElementById('employeeName').value.trim(),
       lastName: document.getElementById('employeeLastName').value.trim(),
