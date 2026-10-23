@@ -263,21 +263,6 @@ function renderBranchSummary(records) {
 }
 
 async function persistRecordUpdate(id, payload) {
-  const response = await fetchJson(`/api/records/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      fecha: payload.fecha,
-      sucursal: payload.sucursal,
-      efectivo: payload.efectivo,
-      transferencias: payload.transferencias,
-      qr: payload.qr,
-      pedidosYa: payload.pedidosYa,
-      tiraxy: payload.tiraxy,
-      notas: payload.notas,
-      stock: payload.stock
-    })
-  });
-
   const currentRecords = getStoredRecords();
   const nextRecords = currentRecords.map((record) => {
     if (String(record.id) !== String(id)) return record;
@@ -298,9 +283,29 @@ async function persistRecordUpdate(id, payload) {
       total
     };
   });
-  saveStoredRecords(nextRecords);
 
-  return response;
+  try {
+    const response = await fetchJson(`/api/records/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        fecha: payload.fecha,
+        sucursal: payload.sucursal,
+        efectivo: payload.efectivo,
+        transferencias: payload.transferencias,
+        qr: payload.qr,
+        pedidosYa: payload.pedidosYa,
+        tiraxy: payload.tiraxy,
+        notas: payload.notas,
+        stock: payload.stock
+      })
+    });
+
+    saveStoredRecords(nextRecords);
+    return response;
+  } catch (error) {
+    saveStoredRecords(nextRecords);
+    throw new Error('No se pudo enviar o cargar los datos');
+  }
 }
 
 function renderRecords(records) {
@@ -981,7 +986,7 @@ function getAnalyticsExportRows() {
     return null;
   }
 
-  const records = loadRecordsSync();
+  const records = getStoredRecords();
   const source = getRecordsForAnalytics(analyticsScope, records);
   const start = new Date(`${fromDate}T00:00:00`);
   const end = new Date(`${toDate}T23:59:59`);
@@ -1064,10 +1069,8 @@ async function exportAnalyticsPdf() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 38;
-    const lineHeight = 14;
 
     const padCurrency = (value) => formatMoneyForPdf(value);
-
     const drawHeader = (pageNumber) => {
       doc.setFillColor(18, 18, 18);
       doc.rect(0, 0, pageWidth, 54, 'F');
@@ -1082,7 +1085,7 @@ async function exportAnalyticsPdf() {
       doc.text(`Período: ${formatReportDate(payload.start.toISOString().slice(0, 10))} - ${formatReportDate(payload.end.toISOString().slice(0, 10))}`, margin + 60, 42);
       doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, pageWidth - 210, 42);
       doc.text(`Página ${pageNumber}`, pageWidth - 90, 26);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(18, 18, 18);
     };
 
     const drawFooter = (pageNumber, totalPages) => {
@@ -1095,16 +1098,11 @@ async function exportAnalyticsPdf() {
     const writeSectionTitle = (title, y) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.setTextColor(19, 19, 19);
       doc.text(title, margin, y);
       doc.setDrawColor(244, 18, 22);
       doc.line(margin, y + 5, pageWidth - margin, y + 5);
       return y + 18;
     };
-
-    let y = 78;
-    drawHeader(1);
-    y = writeSectionTitle('Resumen general del período', y);
 
     const summaryItems = [
       ['Total efectivo', padCurrency(payload.summary.totalEfectivo)],
@@ -1123,162 +1121,99 @@ async function exportAnalyticsPdf() {
       ['Promedio diario', padCurrency(payload.summary.promDiario)]
     ];
 
-    const summaryColWidth = (pageWidth - margin * 2) / 2;
+    let y = 78;
+    drawHeader(1);
+    y = writeSectionTitle('Resumen general del período', y);
+
+    const widthCol = (pageWidth - margin * 2) / 2;
     summaryItems.forEach(([label, value], index) => {
-      const isLeft = index % 2 === 0;
-      const x = isLeft ? margin : margin + summaryColWidth;
-      const summaryY = y + Math.floor(index / 2) * 26;
+      const x = index % 2 === 0 ? margin : margin + widthCol;
+      const rowY = y + Math.floor(index / 2) * 26;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.setTextColor(70, 70, 70);
-      doc.text(label, x + 10, summaryY);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(18, 18, 18);
-      doc.text(String(value), x + 10, summaryY + 14);
+      doc.text(label, x + 10, rowY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value), x + 10, rowY + 14);
     });
 
     y = y + 4 + Math.ceil(summaryItems.length / 2) * 26;
-    y = writeSectionTitle('Totales del período', y);
-
-    const totalRows = [
-      ['Efectivo', payload.summary.totalEfectivo],
-      ['Transferencias', payload.summary.totalTransferencias],
-      ['QR', payload.summary.totalQr],
-      ['Pedidos Ya', payload.summary.totalPedidosYa],
-      ['Tiraxy', payload.summary.totalTiraxy],
-      ['Total general', payload.summary.totalGeneral]
-    ];
-
-    const totalStartY = y + 12;
-    totalRows.forEach(([name, value], index) => {
-      const x = margin + (index % 3) * 180;
-      const rowY = totalStartY + Math.floor(index / 3) * 26;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(70, 70, 70);
-      doc.text(name, x, rowY);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(18, 18, 18);
-      doc.text(padCurrency(value), x + 70, rowY);
-    });
-
-    y = totalStartY + 65;
-    y = writeSectionTitle('Promedios del período', y);
-
-    const avgRows = [
-      ['Promedio efectivo', payload.summary.promEfectivo],
-      ['Promedio transferencias', payload.summary.promTransferencias],
-      ['Promedio QR', payload.summary.promQr],
-      ['Promedio Pedidos Ya', payload.summary.promPedidosYa],
-      ['Promedio Tiraxy', payload.summary.promTiraxy],
-      ['Promedio total', payload.summary.promTotal],
-      ['Promedio diario', payload.summary.promDiario]
-    ];
-
-    avgRows.forEach(([label, value], index) => {
-      const x = margin + (index % 2) * 250;
-      const rowY = y + 22 + Math.floor(index / 2) * 22;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(70, 70, 70);
-      doc.text(label, x, rowY);
-      doc.setTextColor(18, 18, 18);
-      doc.text(padCurrency(value), x + 120, rowY);
-    });
-
-    y = y + 110;
-    y = writeSectionTitle('Detalle completo', y);
+    y = writeSectionTitle('Detalle del período', y);
 
     const columns = [
       { title: 'Fecha', width: 54 },
       { title: 'Hora', width: 42 },
-      { title: 'Usuario', width: 54 },
-      { title: 'Sucursal', width: 54 },
+      { title: 'Usuario', width: 52 },
+      { title: 'Sucursal', width: 52 },
       { title: 'Efectivo', width: 52 },
-      { title: 'Transfer.', width: 52 },
-      { title: 'QR', width: 38 },
-      { title: 'PYa', width: 38 },
+      { title: 'Transfer.', width: 54 },
+      { title: 'QR', width: 42 },
+      { title: 'PYa', width: 42 },
       { title: 'Tiraxy', width: 42 },
-      { title: 'Total', width: 45 },
+      { title: 'Total', width: 48 },
       { title: 'Notas', width: 120 },
       { title: 'Stock', width: 90 }
     ];
 
-    const tableHeaderY = y + 12;
-    const tableStartY = tableHeaderY + 18;
-
-    const renderTableHeader = (headerY) => {
-      let currentX = margin;
+    const renderHeader = (headerY) => {
+      let x = margin;
       doc.setFillColor(240, 240, 240);
       doc.rect(margin, headerY, pageWidth - margin * 2, 16, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7);
-      doc.setTextColor(18, 18, 18);
       columns.forEach((column) => {
-        doc.text(column.title, currentX + 4, headerY + 12);
-        currentX += column.width;
+        doc.text(column.title, x + 4, headerY + 12);
+        x += column.width;
       });
     };
 
-    let currentY = tableStartY;
-    renderTableHeader(tableHeaderY);
-
-    const addPageIfNeeded = (rowsHeight) => {
-      if (currentY + rowsHeight > pageHeight - 35) {
-        doc.addPage();
-        drawHeader(doc.getNumberOfPages());
-        y = 78;
-        currentY = tableStartY;
-        renderTableHeader(tableHeaderY);
-        drawFooter(doc.getNumberOfPages(), doc.getNumberOfPages());
-      }
-    };
+    let currentY = y + 14;
+    renderHeader(currentY - 14);
 
     payload.records.forEach((record) => {
-      const rowValues = [
+      const values = [
         formatReportDate(record.fecha),
         record.hora || '—',
-        String(record.usuario || '—'),
-        String(record.sucursal || '—'),
+        record.usuario || '—',
+        record.sucursal || '—',
         padCurrency(record.efectivo),
         padCurrency(record.transferencias),
         padCurrency(record.qr),
         padCurrency(record.pedidosYa),
         padCurrency(record.tiraxy),
         padCurrency(record.total),
-        record.notas && record.notas !== '—' ? record.notas : '—',
-        record.stock && record.stock !== '—' ? record.stock : '—'
+        record.notas || '—',
+        record.stock || '—'
       ];
 
-      const cellLines = rowValues.map((value, index) => {
+      const cellLines = values.map((value, index) => {
         const maxWidth = columns[index].width - 8;
-        const textValue = String(value || '—');
-        const wrapped = doc.splitTextToSize(textValue, maxWidth);
-        return wrapped.length > 1 ? wrapped : [textValue];
+        const wrapped = doc.splitTextToSize(String(value || '—'), maxWidth);
+        return wrapped.length > 1 ? wrapped : [String(value || '—')];
       });
 
-      const rowHeightValue = Math.max(...cellLines.map((lines) => lines.length)) * 11 + 4;
-      addPageIfNeeded(rowHeightValue + 4);
+      const rowHeight = Math.max(...cellLines.map((lines) => lines.length)) * 11 + 6;
+      if (currentY + rowHeight > pageHeight - 35) {
+        doc.addPage();
+        drawHeader(doc.getNumberOfPages());
+        currentY = 78;
+        renderHeader(currentY - 12);
+        currentY += 14;
+      }
 
       let x = margin;
-      const lineTop = currentY;
-      doc.setDrawColor(215, 215, 215);
+      doc.setDrawColor(210, 210, 210);
       doc.setLineWidth(0.5);
-      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeightValue, 'S');
-
-      rowValues.forEach((value, index) => {
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight, 'S');
+      values.forEach((value, index) => {
         const lines = cellLines[index];
-        const columnWidth = columns[index].width;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.setTextColor(18, 18, 18);
         lines.forEach((line, lineIndex) => {
-          doc.text(line, x + 4, lineTop + 12 + lineIndex * 10);
+          doc.text(line, x + 4, currentY + 12 + lineIndex * 10);
         });
-        x += columnWidth;
+        x += columns[index].width;
       });
-
-      currentY += rowHeightValue;
+      currentY += rowHeight;
     });
 
     const totalPages = doc.getNumberOfPages();
@@ -1322,7 +1257,8 @@ async function renderAnalytics() {
 
   const rangeTotalValue = rangeRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
   const monthTotalValue = monthRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
-  const avgValue = rangeRecords.length ? rangeTotalValue / Math.max(rangeRecords.length, 1) : 0;
+  const daysInRange = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  const avgValue = rangeTotalValue / daysInRange;
 
   chartTitle.textContent = `${analyticsScope} · ${label}`;
   tableTitle.textContent = analyticsScope === 'Negocio' ? 'Historial general' : `Historial · ${analyticsScope}`;
@@ -1550,6 +1486,9 @@ async function renderEmployees() {
       const employee = employees.find((item) => String(item.id) === String(button.dataset.id));
       if (!employee) return;
 
+      const form = document.getElementById('employeeForm');
+      if (form) form.reset();
+
       const idField = document.getElementById('employeeId');
       const nameField = document.getElementById('employeeName');
       const lastNameField = document.getElementById('employeeLastName');
@@ -1559,20 +1498,24 @@ async function renderEmployees() {
       const notesField = document.getElementById('employeeNotes');
       const formTitle = document.getElementById('employeeFormTitle');
       const notesWrap = document.querySelector('.employee-notes-field');
-
-      if (idField) idField.value = employee.id;
-      if (nameField) nameField.value = employee.name;
-      if (lastNameField) lastNameField.value = employee.lastName;
-      if (roleField) roleField.value = employee.role;
-      if (hourlyRateField) hourlyRateField.value = employee.hourlyRate;
-      if (phoneField) phoneField.value = employee.phone;
       const passField = document.getElementById('employeePassword');
       const passWrap = document.querySelector('.employee-password-field');
+
+      if (idField) idField.value = employee.id;
+      if (nameField) nameField.value = employee.name || '';
+      if (lastNameField) lastNameField.value = employee.lastName || '';
+      if (roleField) roleField.value = employee.role || 'Empleado';
+      if (hourlyRateField) hourlyRateField.value = employee.hourlyRate ?? 0;
+      if (phoneField) phoneField.value = employee.phone || '';
       if (passField) passField.value = '';
-      if (passWrap) passWrap.classList.toggle('hidden', employee.role !== 'Encargado');
       if (notesField) notesField.value = employee.notes || '';
-      if (notesWrap) notesWrap.classList.remove('hidden');
+      if (passWrap) passWrap.classList.toggle('hidden', (employee.role || 'Empleado') !== 'Encargado');
+      if (notesWrap) notesWrap.classList.toggle('hidden', !((employee.notes || '').trim()));
       if (formTitle) formTitle.textContent = 'Editar empleado';
+
+      if (roleField) {
+        roleField.dispatchEvent(new Event('change'));
+      }
 
       toggleSection('employees');
       document.getElementById('employeeForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
