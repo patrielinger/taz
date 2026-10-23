@@ -1,14 +1,26 @@
 [
   {
-    "id": 5,
-    "name": "Patricio",
-    "last_name": "Elinger",
+    "id": 3,
+    "name": "mariano",
+    "last_name": "velzcos",
     "role": "Encargado",
-    "password_hash": "$2a$10$mW5qRdU3UJjOzCZcWYuXYebBuuRHL7EbniVahrw6odvadH//WeVeG",
+    "password_hash": "$2a$10$kdZfSnACUeCWT4EAI6DoxeHIvqNj20p.WVIG1Ju/CDBGlSC1X0giq",
     "hourly_rate": 4200,
     "phone": "3885176803",
     "branch": "Centro",
     "notes": "",
-    "created_at": "2026-09-20T17:52:29.000Z"
+    "created_at": "2026-09-24T20:20:46.040Z"
+  },
+  {
+    "id": 1,
+    "name": "Patricio",
+    "last_name": "Elinger",
+    "role": "Encargado",
+    "password_hash": "$2a$10$95P67gSwnGI0uf05rTMieu5EvsYN.viiInFvTGm3.Jx/n6lpzP7e6",
+    "hourly_rate": 4200,
+    "phone": "3885176803",
+    "branch": "Centro",
+    "notes": "",
+    "created_at": "2026-09-24T19:11:36.000Z"
   }
 ]

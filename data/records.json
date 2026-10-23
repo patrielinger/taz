@@ -1,5 +1,20 @@
 [
   {
+    "id": 2,
+    "fecha": "2026-09-24",
+    "hora": "20:22:21",
+    "usuario": "Patricio Elinger",
+    "sucursal": "Centro",
+    "efectivo": 2000,
+    "transferencias": 30000,
+    "qr": 0,
+    "pedidosYa": 0,
+    "notas": "",
+    "stock": "",
+    "total": 32000,
+    "created_at": "2026-09-24T20:22:21.165Z"
+  },
+  {
     "id": 6,
     "fecha": "2026-09-20",
     "hora": "18:04:38",
