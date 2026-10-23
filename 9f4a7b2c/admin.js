@@ -244,6 +244,47 @@ function renderBranchSummary(records) {
   }
 }
 
+async function persistRecordUpdate(id, payload) {
+  const response = await fetchJson(`/api/records/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      fecha: payload.fecha,
+      sucursal: payload.sucursal,
+      efectivo: payload.efectivo,
+      transferencias: payload.transferencias,
+      qr: payload.qr,
+      pedidosYa: payload.pedidosYa,
+      tiraxy: payload.tiraxy,
+      notas: payload.notas,
+      stock: payload.stock
+    })
+  });
+
+  const currentRecords = getStoredRecords();
+  const nextRecords = currentRecords.map((record) => {
+    if (String(record.id) !== String(id)) return record;
+
+    const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
+
+    return {
+      ...record,
+      fecha: payload.fecha || record.fecha,
+      sucursal: payload.sucursal || record.sucursal,
+      efectivo: Number(payload.efectivo || 0),
+      transferencias: Number(payload.transferencias || 0),
+      qr: Number(payload.qr || 0),
+      pedidosYa: Number(payload.pedidosYa || 0),
+      tiraxy: Number(payload.tiraxy || 0),
+      notas: payload.notas || '',
+      stock: payload.stock || '',
+      total
+    };
+  });
+  saveStoredRecords(nextRecords);
+
+  return response;
+}
+
 function renderRecords(records) {
   const dayFilterInput = document.getElementById('dayFilter');
   const day = dayFilterInput ? dayFilterInput.value : new Date().toISOString().slice(0, 10);
@@ -252,18 +293,19 @@ function renderRecords(records) {
   if (!table) return;
 
   const filteredRecords = getSelectedDayRecords(records, day).sort((a, b) => String(b.id).localeCompare(String(a.id)));
+  const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
 
   if (!filteredRecords.length) {
     table.innerHTML = `
         <tr>
-          <td colspan="12">No hay ingresos cargados para esta fecha.</td>
+          <td colspan="13">No hay ingresos cargados para esta fecha.</td>
         </tr>
     `;
     return;
   }
 
   table.innerHTML = filteredRecords.map((record) => `
-    <tr>
+    <tr data-id="${record.id}">
       <td>${record.sucursal}</td>
       <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora}</td>
@@ -276,8 +318,60 @@ function renderRecords(records) {
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
+      <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
     </tr>
   `).join('');
+
+  if (isAdmin) {
+    document.querySelectorAll('#dailyRecordsTable .edit-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = filteredRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      openRecordEditor(record, async (payload) => {
+        try {
+          await persistRecordUpdate(id, {
+            fecha: payload.fecha || record.fecha,
+            sucursal: payload.sucursal || record.sucursal,
+            efectivo: payload.efectivo,
+            transferencias: payload.transferencias,
+            qr: payload.qr,
+            pedidosYa: payload.pedidosYa,
+            tiraxy: payload.tiraxy,
+            notas: payload.notas,
+            stock: payload.stock
+          });
+          await renderDashboard();
+          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+        } catch (err) {
+          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
+        }
+      });
+    }));
+
+    document.querySelectorAll('#dailyRecordsTable .delete-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = filteredRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      setupModal().show({
+        title: 'Eliminar ingreso',
+        body: `<p>¿Eliminar el registro de ${record.sucursal} del ${formatDisplayDate(record.fecha)}?</p>`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        showCancel: true,
+        onConfirm: async () => {
+          try {
+            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            await renderDashboard();
+            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+          } catch (err) {
+            showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
+          }
+        }
+      });
+    }));
+  }
 }
 
 function renderLastRecord(records) {
@@ -457,7 +551,7 @@ function openRecordEditor(record, onSave) {
           <label for="editRecordPedidosYa">PedidosYa</label>
           <input id="editRecordPedidosYa" type="text" inputmode="numeric" value="${Number(record.pedidosYa ?? record.pedidos_ya ?? 0)}">
         </div>
-        <div class="field-group" id="editRecordTiraxyGroup" ${record.sucursal === 'Alvear' || record.sucursal === 'Centro' ? '' : 'style="display:none;"'}>
+        <div class="field-group" id="editRecordTiraxyGroup" ${['Alvear', 'Centro'].includes(normalizeBranchName(record.sucursal)) ? '' : 'style="display:none;"'}>
           <label for="editRecordTiraxy">Tiraxy</label>
           <input id="editRecordTiraxy" type="text" inputmode="numeric" value="${Number(record.tiraxy || 0)}">
         </div>
@@ -480,7 +574,7 @@ function openRecordEditor(record, onSave) {
   const tiraxyField = document.getElementById('editRecordTiraxy');
 
   const syncEditorTiraxyVisibility = () => {
-    const shouldShow = branchField?.value === 'Alvear';
+    const shouldShow = ['Alvear', 'Centro'].includes(normalizeBranchName(branchField?.value || 'Centro'));
     if (tiraxyFieldGroup) {
       tiraxyFieldGroup.style.display = shouldShow ? 'block' : 'none';
     }
@@ -557,9 +651,16 @@ async function renderRecordsByDate(date) {
 
       openRecordEditor(r, async (payload) => {
         try {
-          await fetchJson(`/api/records/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ fecha: payload.fecha || r.fecha, sucursal: payload.sucursal || r.sucursal, efectivo: payload.efectivo, transferencias: payload.transferencias, qr: payload.qr, pedidosYa: payload.pedidosYa, tiraxy: payload.tiraxy, notas: payload.notas, stock: payload.stock })
+          await persistRecordUpdate(id, {
+            fecha: payload.fecha || r.fecha,
+            sucursal: payload.sucursal || r.sucursal,
+            efectivo: payload.efectivo,
+            transferencias: payload.transferencias,
+            qr: payload.qr,
+            pedidosYa: payload.pedidosYa,
+            tiraxy: payload.tiraxy,
+            notas: payload.notas,
+            stock: payload.stock
           });
           await renderRecordsByDate(date);
           await renderDashboard();
@@ -1309,19 +1410,16 @@ async function renderAnalytics() {
 
       openRecordEditor(record, async (payload) => {
         try {
-          await fetchJson(`/api/records/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-              fecha: payload.fecha || record.fecha,
-              sucursal: payload.sucursal || record.sucursal,
-              efectivo: payload.efectivo,
-              transferencias: payload.transferencias,
-              qr: payload.qr,
-              pedidosYa: payload.pedidosYa,
-              tiraxy: payload.tiraxy,
-              notas: payload.notas,
-              stock: payload.stock,
-            })
+          await persistRecordUpdate(id, {
+            fecha: payload.fecha || record.fecha,
+            sucursal: payload.sucursal || record.sucursal,
+            efectivo: payload.efectivo,
+            transferencias: payload.transferencias,
+            qr: payload.qr,
+            pedidosYa: payload.pedidosYa,
+            tiraxy: payload.tiraxy,
+            notas: payload.notas,
+            stock: payload.stock,
           });
           await renderAnalytics();
           await renderDashboard();

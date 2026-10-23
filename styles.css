@@ -1447,7 +1447,7 @@ footer p {
 }
 #storeStatus {
     margin-bottom: 20px;
-    text-align:startF
+    text-align: start;
   }
 .red {
   display: block;
@@ -1696,7 +1696,6 @@ footer p {
   }
 
   .menu-item-desc {
-    display: block;
     width: 100%;
     max-width: 100%;
     font-size: 12px;
