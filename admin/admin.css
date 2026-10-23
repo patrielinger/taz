@@ -698,3 +698,143 @@ canvas {
     width: 100%;
   }
 }
+
+@media (max-width: 430px) {
+  .admin-shell {
+    padding: 18px 12px 52px;
+  }
+
+  .admin-header-inner {
+    padding: 14px 12px;
+  }
+
+  .sidebar {
+    padding: 14px 12px;
+  }
+
+  .brand-block {
+    padding: 8px 8px 18px;
+    margin-bottom: 12px;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .nav-link {
+    padding: 10px 8px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .panel,
+  .intake-panel,
+  .chart-panel,
+  .employee-panel,
+  .employee-list-panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .two-cols,
+  .three-cols,
+  .payment-grid,
+  .notes-stock-grid,
+  .stats-grid,
+  .employee-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row {
+    gap: 12px;
+  }
+
+  .admin-form {
+    gap: 12px;
+  }
+
+  .input,
+  input,
+  select,
+  textarea,
+  button {
+    min-height: 46px;
+  }
+
+  .primary-btn,
+  .secondary-btn,
+  .form-actions button,
+  .analytics-range-btn,
+  .analytics-tab {
+    width: 100%;
+  }
+
+  .form-actions,
+  .analytics-shortcuts,
+  .analytics-custom-range,
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .analytics-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .analytics-tab {
+    min-width: 0;
+    flex-basis: auto;
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .analytics-range-controls {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .analytics-custom-range {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .range-controls,
+  .mini-filter,
+  .range-controls label {
+    width: 100%;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  td,
+  th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .modal-card {
+    border-radius: 14px;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .modal-actions {
+    padding-bottom: 16px;
+  }
+}

@@ -14,6 +14,7 @@ function normalizeBranchName(branch) {
     Hattogu: 'Hattogu',
     'Jatobú': 'Hattogu',
     Centro: 'Centro',
+    Alvear: 'Centro',
     'Alto Comedero': 'Alto Comedero'
   };
   return map[value] || value;
@@ -85,9 +86,27 @@ function saveStoredEmployees(employees) {
   localStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
 }
 
+function syncEmployeeLocalData(employee, fallbackId = null) {
+  const storedEmployees = getStoredEmployees();
+  const employeeId = employee.id ?? employee.employee_id ?? employee.employeeId ?? fallbackId ?? Date.now();
+  const normalized = normalizeEmployee({
+    ...employee,
+    id: employeeId,
+    lastName: employee.lastName ?? employee.last_name ?? '',
+    hourlyRate: employee.hourlyRate ?? employee.hourly_rate ?? 0,
+    password: employee.password ?? employee.password_hash ?? ''
+  });
+
+  const nextEmployees = storedEmployees.filter((item) => String(item.id) !== String(employeeId));
+  nextEmployees.push(normalized);
+  saveStoredEmployees(nextEmployees);
+  employeeCache = nextEmployees;
+  return normalized;
+}
+
 function normalizeEmployee(row) {
   return {
-    id: row.id,
+    id: row.id ?? row.employee_id ?? row.employeeId,
     name: row.name || '',
     lastName: row.last_name || row.lastName || '',
     role: row.role || 'Empleado',
@@ -150,6 +169,13 @@ function formatDateInput(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatDisplayDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(date);
+}
+
 function setDefaultDate() {
   const today = new Date();
   const todayStr = formatDateInput(today);
@@ -192,7 +218,8 @@ function renderBranchSummary(records) {
       efectivo: filtered.reduce((sum, item) => sum + Number(item.efectivo || 0), 0),
       transferencias: filtered.reduce((sum, item) => sum + Number(item.transferencias || 0), 0),
       qr: filtered.reduce((sum, item) => sum + Number(item.qr || 0), 0),
-      pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || 0), 0),
+      pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || item.pedidos_ya || 0), 0),
+      tiraxy: filtered.reduce((sum, item) => sum + Number(item.tiraxy || 0), 0),
       total: filtered.reduce((sum, item) => sum + Number(item.total || 0), 0)
     };
   });
@@ -204,6 +231,7 @@ function renderBranchSummary(records) {
       <td>${money(item.transferencias)}</td>
       <td>${money(item.qr)}</td>
       <td>${money(item.pedidosYa)}</td>
+      <td>${money(item.tiraxy || 0)}</td>
       <td>${money(item.total)}</td>
     </tr>
   `).join('');
@@ -225,9 +253,54 @@ function renderBranchSummary(records) {
 
   const branchAverageEl = document.getElementById('branchAverage');
   if (branchAverageEl) {
-    const avg = totals.length ? todayTotal / totals.length : 0;
+    const selectedBranchValue = document.getElementById('branchSelect')?.value || 'Centro';
+    const selectedBranch = normalizeBranchName(selectedBranchValue);
+    const selectedBranchRecords = dayRecords.filter((record) => normalizeBranchName(record.sucursal) === selectedBranch);
+    const selectedBranchTotal = selectedBranchRecords.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const avg = selectedBranchRecords.length ? selectedBranchTotal / selectedBranchRecords.length : 0;
     branchAverageEl.textContent = money(avg);
   }
+}
+
+async function persistRecordUpdate(id, payload) {
+  const response = await fetchJson(`/api/records/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      fecha: payload.fecha,
+      sucursal: payload.sucursal,
+      efectivo: payload.efectivo,
+      transferencias: payload.transferencias,
+      qr: payload.qr,
+      pedidosYa: payload.pedidosYa,
+      tiraxy: payload.tiraxy,
+      notas: payload.notas,
+      stock: payload.stock
+    })
+  });
+
+  const currentRecords = getStoredRecords();
+  const nextRecords = currentRecords.map((record) => {
+    if (String(record.id) !== String(id)) return record;
+
+    const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
+
+    return {
+      ...record,
+      fecha: payload.fecha || record.fecha,
+      sucursal: payload.sucursal || record.sucursal,
+      efectivo: Number(payload.efectivo || 0),
+      transferencias: Number(payload.transferencias || 0),
+      qr: Number(payload.qr || 0),
+      pedidosYa: Number(payload.pedidosYa || 0),
+      tiraxy: Number(payload.tiraxy || 0),
+      notas: payload.notas || '',
+      stock: payload.stock || '',
+      total
+    };
+  });
+  saveStoredRecords(nextRecords);
+
+  return response;
 }
 
 function renderRecords(records) {
@@ -238,31 +311,80 @@ function renderRecords(records) {
   if (!table) return;
 
   const filteredRecords = getSelectedDayRecords(records, day).sort((a, b) => String(b.id).localeCompare(String(a.id)));
+  const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
 
   if (!filteredRecords.length) {
     table.innerHTML = `
         <tr>
-          <td colspan="11">No hay ingresos cargados para esta fecha.</td>
+          <td colspan="13">No hay ingresos cargados para esta fecha.</td>
         </tr>
     `;
     return;
   }
 
   table.innerHTML = filteredRecords.map((record) => `
-    <tr>
+    <tr data-id="${record.id}">
       <td>${record.sucursal}</td>
-      <td>${record.fecha}</td>
+      <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora}</td>
       <td>${record.usuario}</td>
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
+      <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
     </tr>
   `).join('');
+
+  if (isAdmin) {
+    document.querySelectorAll('#dailyRecordsTable .edit-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = filteredRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      openRecordEditor(record, async (payload) => {
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || record.fecha,
+          sucursal: payload.sucursal || record.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock
+        });
+        await renderDashboard();
+      });
+    }));
+
+    document.querySelectorAll('#dailyRecordsTable .delete-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = filteredRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      setupModal().show({
+        title: 'Eliminar ingreso',
+        body: `<p>¿Eliminar el registro de ${record.sucursal} del ${formatDisplayDate(record.fecha)}?</p>`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        showCancel: true,
+        onConfirm: async () => {
+          try {
+            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            await renderDashboard();
+            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+          } catch (err) {
+            showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
+          }
+        }
+      });
+    }));
+  }
 }
 
 function renderLastRecord(records) {
@@ -292,8 +414,8 @@ function renderLastRecord(records) {
 
   panel.style.display = 'block';
   content.innerHTML = `
-    <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${latest.fecha} ${latest.hora}</div>
-    <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)}</div>
+    <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${formatDisplayDate(latest.fecha)} ${latest.hora}</div>
+    <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)} — Tiraxy: ${money(latest.tiraxy || 0)}</div>
     <div>Total: ${money(latest.total)}</div>
     <div>Notas: ${latest.notas || '—'}</div>
     <div>Stock: ${latest.stock || '—'}</div>
@@ -442,6 +564,10 @@ function openRecordEditor(record, onSave) {
           <label for="editRecordPedidosYa">PedidosYa</label>
           <input id="editRecordPedidosYa" type="text" inputmode="numeric" value="${Number(record.pedidosYa ?? record.pedidos_ya ?? 0)}">
         </div>
+        <div class="field-group" id="editRecordTiraxyGroup" ${['Alvear', 'Centro'].includes(normalizeBranchName(record.sucursal)) ? '' : 'style="display:none;"'}>
+          <label for="editRecordTiraxy">Tiraxy</label>
+          <input id="editRecordTiraxy" type="text" inputmode="numeric" value="${Number(record.tiraxy || 0)}">
+        </div>
       </div>
       <div class="field-row notes-stock-grid">
         <div class="field-group">
@@ -456,6 +582,23 @@ function openRecordEditor(record, onSave) {
     </form>
   `;
 
+  const branchField = document.getElementById('editRecordBranch');
+  const tiraxyFieldGroup = document.getElementById('editRecordTiraxyGroup');
+  const tiraxyField = document.getElementById('editRecordTiraxy');
+
+  const syncEditorTiraxyVisibility = () => {
+    const shouldShow = ['Alvear', 'Centro'].includes(normalizeBranchName(branchField?.value || 'Centro'));
+    if (tiraxyFieldGroup) {
+      tiraxyFieldGroup.style.display = shouldShow ? 'block' : 'none';
+    }
+    if (!shouldShow && tiraxyField) {
+      tiraxyField.value = '0';
+    }
+  };
+
+  branchField?.addEventListener('change', syncEditorTiraxyVisibility);
+  syncEditorTiraxyVisibility();
+
   modal.show({
     title: 'Editar ingreso',
     body,
@@ -463,20 +606,28 @@ function openRecordEditor(record, onSave) {
     cancelText: 'Cancelar',
     showCancel: true,
     allowBackdropClose: true,
-    onConfirm: () => {
+    onConfirm: async () => {
       const form = document.getElementById('recordEditForm');
       if (!form) return;
-      const payload = {
-        fecha: document.getElementById('editRecordDate').value,
-        sucursal: document.getElementById('editRecordBranch').value,
-        efectivo: Number(sanitizeNumber(document.getElementById('editRecordCash').value)),
-        transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
-        qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
-        pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
-        notas: document.getElementById('editRecordNotes').value.trim(),
-        stock: document.getElementById('editRecordStock').value.trim(),
-      };
-      onSave(payload);
+
+      try {
+        const payload = {
+          fecha: document.getElementById('editRecordDate').value,
+          sucursal: document.getElementById('editRecordBranch').value,
+          efectivo: Number(sanitizeNumber(document.getElementById('editRecordCash').value)),
+          transferencias: Number(sanitizeNumber(document.getElementById('editRecordTransfer').value)),
+          qr: Number(sanitizeNumber(document.getElementById('editRecordQr').value)),
+          pedidosYa: Number(sanitizeNumber(document.getElementById('editRecordPedidosYa').value)),
+          tiraxy: Number(sanitizeNumber(document.getElementById('editRecordTiraxy')?.value || 0)),
+          notas: document.getElementById('editRecordNotes').value.trim(),
+          stock: document.getElementById('editRecordStock').value.trim(),
+        };
+
+        await onSave(payload);
+        showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+      } catch (error) {
+        showNotice('No se pudo actualizar', error?.message || 'No se pudo actualizar el registro.', 'error');
+      }
     }
   });
 }
@@ -489,7 +640,7 @@ async function renderRecordsByDate(date) {
   const filtered = records.filter((r) => r.fecha === date).sort((a, b) => String(a.hora).localeCompare(b.hora));
 
   if (!filtered.length) {
-    table.innerHTML = '<tr><td colspan="11">No hay registros para la fecha seleccionada.</td></tr>';
+    table.innerHTML = '<tr><td colspan="12">No hay registros para la fecha seleccionada.</td></tr>';
     return;
   }
 
@@ -504,6 +655,7 @@ async function renderRecordsByDate(date) {
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
@@ -518,17 +670,19 @@ async function renderRecordsByDate(date) {
       if (!r) return;
 
       openRecordEditor(r, async (payload) => {
-        try {
-          await fetchJson(`/api/records/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ fecha: payload.fecha || r.fecha, sucursal: payload.sucursal || r.sucursal, efectivo: payload.efectivo, transferencias: payload.transferencias, qr: payload.qr, pedidosYa: payload.pedidosYa, notas: payload.notas, stock: payload.stock })
-          });
-          await renderRecordsByDate(date);
-          await renderDashboard();
-          showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
-        } catch (err) {
-          showNotice('No se pudo actualizar', err.message || 'No se pudo actualizar el registro.', 'error');
-        }
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || r.fecha,
+          sucursal: payload.sucursal || r.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock
+        });
+        await renderRecordsByDate(date);
+        await renderDashboard();
       });
     }));
 
@@ -539,7 +693,7 @@ async function renderRecordsByDate(date) {
 
       setupModal().show({
         title: 'Eliminar ingreso',
-        body: `<p>¿Eliminar el registro de ${r.sucursal} del ${r.fecha}?</p>`,
+        body: `<p>¿Eliminar el registro de ${r.sucursal} del ${formatDisplayDate(r.fecha)}?</p>`,
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',
         showCancel: true,
@@ -792,6 +946,356 @@ function getActiveAnalyticsRange() {
   return { start: safeStart, end: safeEnd, label: 'rango personalizado', days: Math.max(1, Math.round((safeEnd - safeStart) / 86400000) + 1) };
 }
 
+function formatReportDate(value) {
+  if (!value) return '—';
+  return formatDisplayDate(value);
+}
+
+function formatReportDateTime(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
+function formatMoneyForPdf(value) {
+  const number = Number(value || 0);
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(number);
+}
+
+function getAnalyticsExportRows() {
+  const analyticsScope = document.querySelector('.analytics-tab.active')?.dataset.analytics || 'Negocio';
+  const fromDate = document.getElementById('analyticsFromDate')?.value;
+  const toDate = document.getElementById('analyticsToDate')?.value;
+
+  if (!fromDate || !toDate) {
+    return null;
+  }
+
+  const records = loadRecordsSync();
+  const source = getRecordsForAnalytics(analyticsScope, records);
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T23:59:59`);
+
+  const filteredRecords = source
+    .filter((record) => {
+      if (!record.fecha) return false;
+      const recordDate = new Date(`${record.fecha}T00:00:00`);
+      return recordDate >= start && recordDate <= end;
+    })
+    .map((record) => ({
+      ...record,
+      fecha: record.fecha || '',
+      hora: record.hora || '',
+      usuario: record.usuario || '—',
+      sucursal: normalizeBranchName(record.sucursal),
+      efectivo: Number(record.efectivo || 0),
+      transferencias: Number(record.transferencias || 0),
+      qr: Number(record.qr || 0),
+      pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
+      tiraxy: Number(record.tiraxy || 0),
+      total: Number(record.total || 0),
+      notas: record.notas || '—',
+      stock: record.stock || '—'
+    }))
+    .sort((a, b) => {
+      const dateDiff = String(b.fecha).localeCompare(String(a.fecha));
+      if (dateDiff !== 0) return dateDiff;
+      return String(b.hora || '00:00:00').localeCompare(String(a.hora || '00:00:00'));
+    });
+
+  const totalEfectivo = filteredRecords.reduce((sum, record) => sum + record.efectivo, 0);
+  const totalTransferencias = filteredRecords.reduce((sum, record) => sum + record.transferencias, 0);
+  const totalQr = filteredRecords.reduce((sum, record) => sum + record.qr, 0);
+  const totalPedidosYa = filteredRecords.reduce((sum, record) => sum + record.pedidosYa, 0);
+  const totalTiraxy = filteredRecords.reduce((sum, record) => sum + record.tiraxy, 0);
+  const totalGeneral = filteredRecords.reduce((sum, record) => sum + record.total, 0);
+  const daysCount = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  const recordCount = filteredRecords.length;
+
+  return {
+    scope: analyticsScope,
+    start,
+    end,
+    records: filteredRecords,
+    summary: {
+      totalEfectivo,
+      totalTransferencias,
+      totalQr,
+      totalPedidosYa,
+      totalTiraxy,
+      totalGeneral,
+      recordCount,
+      promEfectivo: recordCount ? totalEfectivo / recordCount : 0,
+      promTransferencias: recordCount ? totalTransferencias / recordCount : 0,
+      promQr: recordCount ? totalQr / recordCount : 0,
+      promPedidosYa: recordCount ? totalPedidosYa / recordCount : 0,
+      promTiraxy: recordCount ? totalTiraxy / recordCount : 0,
+      promTotal: recordCount ? totalGeneral / recordCount : 0,
+      promDiario: totalGeneral / daysCount
+    }
+  };
+}
+
+async function exportAnalyticsPdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showNotice('PDF no disponible', 'No se pudo cargar la librería de PDF. Intenta nuevamente.', 'error');
+    return;
+  }
+
+  try {
+    const payload = getAnalyticsExportRows();
+    if (!payload || !payload.records.length) {
+      showNotice('Sin registros', 'No hay registros para el rango seleccionado.', 'warning');
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 38;
+    const lineHeight = 14;
+
+    const padCurrency = (value) => formatMoneyForPdf(value);
+
+    const drawHeader = (pageNumber) => {
+      doc.setFillColor(18, 18, 18);
+      doc.rect(0, 0, pageWidth, 54, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('TAZ', margin, 26);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text('Informe de Historial', margin + 60, 26);
+      doc.setFontSize(9);
+      doc.text(`Período: ${formatReportDate(payload.start.toISOString().slice(0, 10))} - ${formatReportDate(payload.end.toISOString().slice(0, 10))}`, margin + 60, 42);
+      doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, pageWidth - 210, 42);
+      doc.text(`Página ${pageNumber}`, pageWidth - 90, 26);
+      doc.setTextColor(0, 0, 0);
+    };
+
+    const drawFooter = (pageNumber, totalPages) => {
+      doc.setTextColor(90, 90, 90);
+      doc.setFontSize(8);
+      doc.text(`Página ${pageNumber} de ${totalPages}`, pageWidth / 2 - 30, pageHeight - 16);
+      doc.text('TAZ · Informe de Historial', margin, pageHeight - 16);
+    };
+
+    const writeSectionTitle = (title, y) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(19, 19, 19);
+      doc.text(title, margin, y);
+      doc.setDrawColor(244, 18, 22);
+      doc.line(margin, y + 5, pageWidth - margin, y + 5);
+      return y + 18;
+    };
+
+    let y = 78;
+    drawHeader(1);
+    y = writeSectionTitle('Resumen general del período', y);
+
+    const summaryItems = [
+      ['Total efectivo', padCurrency(payload.summary.totalEfectivo)],
+      ['Total transferencias', padCurrency(payload.summary.totalTransferencias)],
+      ['Total QR', padCurrency(payload.summary.totalQr)],
+      ['Total Pedidos Ya', padCurrency(payload.summary.totalPedidosYa)],
+      ['Total Tiraxy', padCurrency(payload.summary.totalTiraxy)],
+      ['Total general', padCurrency(payload.summary.totalGeneral)],
+      ['Cantidad de registros', String(payload.summary.recordCount)],
+      ['Promedio efectivo', padCurrency(payload.summary.promEfectivo)],
+      ['Promedio transferencias', padCurrency(payload.summary.promTransferencias)],
+      ['Promedio QR', padCurrency(payload.summary.promQr)],
+      ['Promedio Pedidos Ya', padCurrency(payload.summary.promPedidosYa)],
+      ['Promedio Tiraxy', padCurrency(payload.summary.promTiraxy)],
+      ['Promedio total', padCurrency(payload.summary.promTotal)],
+      ['Promedio diario', padCurrency(payload.summary.promDiario)]
+    ];
+
+    const summaryColWidth = (pageWidth - margin * 2) / 2;
+    summaryItems.forEach(([label, value], index) => {
+      const isLeft = index % 2 === 0;
+      const x = isLeft ? margin : margin + summaryColWidth;
+      const summaryY = y + Math.floor(index / 2) * 26;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(label, x + 10, summaryY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(18, 18, 18);
+      doc.text(String(value), x + 10, summaryY + 14);
+    });
+
+    y = y + 4 + Math.ceil(summaryItems.length / 2) * 26;
+    y = writeSectionTitle('Totales del período', y);
+
+    const totalRows = [
+      ['Efectivo', payload.summary.totalEfectivo],
+      ['Transferencias', payload.summary.totalTransferencias],
+      ['QR', payload.summary.totalQr],
+      ['Pedidos Ya', payload.summary.totalPedidosYa],
+      ['Tiraxy', payload.summary.totalTiraxy],
+      ['Total general', payload.summary.totalGeneral]
+    ];
+
+    const totalStartY = y + 12;
+    totalRows.forEach(([name, value], index) => {
+      const x = margin + (index % 3) * 180;
+      const rowY = totalStartY + Math.floor(index / 3) * 26;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(name, x, rowY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(18, 18, 18);
+      doc.text(padCurrency(value), x + 70, rowY);
+    });
+
+    y = totalStartY + 65;
+    y = writeSectionTitle('Promedios del período', y);
+
+    const avgRows = [
+      ['Promedio efectivo', payload.summary.promEfectivo],
+      ['Promedio transferencias', payload.summary.promTransferencias],
+      ['Promedio QR', payload.summary.promQr],
+      ['Promedio Pedidos Ya', payload.summary.promPedidosYa],
+      ['Promedio Tiraxy', payload.summary.promTiraxy],
+      ['Promedio total', payload.summary.promTotal],
+      ['Promedio diario', payload.summary.promDiario]
+    ];
+
+    avgRows.forEach(([label, value], index) => {
+      const x = margin + (index % 2) * 250;
+      const rowY = y + 22 + Math.floor(index / 2) * 22;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      doc.text(label, x, rowY);
+      doc.setTextColor(18, 18, 18);
+      doc.text(padCurrency(value), x + 120, rowY);
+    });
+
+    y = y + 110;
+    y = writeSectionTitle('Detalle completo', y);
+
+    const columns = [
+      { title: 'Fecha', width: 54 },
+      { title: 'Hora', width: 42 },
+      { title: 'Usuario', width: 54 },
+      { title: 'Sucursal', width: 54 },
+      { title: 'Efectivo', width: 52 },
+      { title: 'Transfer.', width: 52 },
+      { title: 'QR', width: 38 },
+      { title: 'PYa', width: 38 },
+      { title: 'Tiraxy', width: 42 },
+      { title: 'Total', width: 45 },
+      { title: 'Notas', width: 120 },
+      { title: 'Stock', width: 90 }
+    ];
+
+    const tableHeaderY = y + 12;
+    const tableStartY = tableHeaderY + 18;
+
+    const renderTableHeader = (headerY) => {
+      let currentX = margin;
+      doc.setFillColor(240, 240, 240);
+      doc.rect(margin, headerY, pageWidth - margin * 2, 16, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(18, 18, 18);
+      columns.forEach((column) => {
+        doc.text(column.title, currentX + 4, headerY + 12);
+        currentX += column.width;
+      });
+    };
+
+    let currentY = tableStartY;
+    renderTableHeader(tableHeaderY);
+
+    const addPageIfNeeded = (rowsHeight) => {
+      if (currentY + rowsHeight > pageHeight - 35) {
+        doc.addPage();
+        drawHeader(doc.getNumberOfPages());
+        y = 78;
+        currentY = tableStartY;
+        renderTableHeader(tableHeaderY);
+        drawFooter(doc.getNumberOfPages(), doc.getNumberOfPages());
+      }
+    };
+
+    payload.records.forEach((record) => {
+      const rowValues = [
+        formatReportDate(record.fecha),
+        record.hora || '—',
+        String(record.usuario || '—'),
+        String(record.sucursal || '—'),
+        padCurrency(record.efectivo),
+        padCurrency(record.transferencias),
+        padCurrency(record.qr),
+        padCurrency(record.pedidosYa),
+        padCurrency(record.tiraxy),
+        padCurrency(record.total),
+        record.notas && record.notas !== '—' ? record.notas : '—',
+        record.stock && record.stock !== '—' ? record.stock : '—'
+      ];
+
+      const cellLines = rowValues.map((value, index) => {
+        const maxWidth = columns[index].width - 8;
+        const textValue = String(value || '—');
+        const wrapped = doc.splitTextToSize(textValue, maxWidth);
+        return wrapped.length > 1 ? wrapped : [textValue];
+      });
+
+      const rowHeightValue = Math.max(...cellLines.map((lines) => lines.length)) * 11 + 4;
+      addPageIfNeeded(rowHeightValue + 4);
+
+      let x = margin;
+      const lineTop = currentY;
+      doc.setDrawColor(215, 215, 215);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeightValue, 'S');
+
+      rowValues.forEach((value, index) => {
+        const lines = cellLines[index];
+        const columnWidth = columns[index].width;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(18, 18, 18);
+        lines.forEach((line, lineIndex) => {
+          doc.text(line, x + 4, lineTop + 12 + lineIndex * 10);
+        });
+        x += columnWidth;
+      });
+
+      currentY += rowHeightValue;
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
+      doc.setPage(pageIndex);
+      drawHeader(pageIndex);
+      drawFooter(pageIndex, totalPages);
+    }
+
+    const filename = `TAZ_Historial_${new Date(payload.start).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}_a_${new Date(payload.end).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}.pdf`;
+    doc.save(filename.replace(/\s+/g, ''));
+  } catch (error) {
+    console.error('Error generating PDF', error);
+    showNotice('No se pudo exportar', 'Hubo un error al generar el PDF. Intenta nuevamente.', 'error');
+  }
+}
+
 async function renderAnalytics() {
   const analyticsScope = document.querySelector('.analytics-tab.active')?.dataset.analytics || 'Negocio';
   const records = await loadRecords();
@@ -888,26 +1392,78 @@ async function renderAnalytics() {
 
   setupChartHover(canvas, chartPoints);
 
+  const isAdmin = !(sessionStorage.getItem(SESSION_KEY) || '').startsWith('encargado:');
+
   if (!selectedRecords.length) {
-    table.innerHTML = '<tr><td colspan="11">No hay registros para el rango seleccionado.</td></tr>';
+    table.innerHTML = `<tr><td colspan="${isAdmin ? 13 : 12}">No hay registros para el rango seleccionado.</td></tr>`;
     return;
   }
 
   table.innerHTML = selectedRecords.map((record) => `
-    <tr>
-      <td>${record.fecha}</td>
+    <tr data-id="${record.id}">
+      <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora || '—'}</td>
       <td>${normalizeBranchName(record.sucursal)}</td>
       <td>${record.usuario}</td>
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
       <td>${money(record.qr)}</td>
-      <td>${money(record.pedidosYa || 0)}</td>
+      <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
+      <td>${money(record.tiraxy || 0)}</td>
       <td>${money(record.total)}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
+      <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
     </tr>
   `).join('');
+
+  if (isAdmin) {
+    document.querySelectorAll('#analyticsRecordsTable .edit-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = selectedRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      openRecordEditor(record, async (payload) => {
+        await persistRecordUpdate(id, {
+          fecha: payload.fecha || record.fecha,
+          sucursal: payload.sucursal || record.sucursal,
+          efectivo: payload.efectivo,
+          transferencias: payload.transferencias,
+          qr: payload.qr,
+          pedidosYa: payload.pedidosYa,
+          tiraxy: payload.tiraxy,
+          notas: payload.notas,
+          stock: payload.stock,
+        });
+        await renderAnalytics();
+        await renderDashboard();
+      });
+    }));
+
+    document.querySelectorAll('#analyticsRecordsTable .delete-record').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const record = selectedRecords.find((item) => String(item.id) === String(id));
+      if (!record) return;
+
+      setupModal().show({
+        title: 'Eliminar ingreso',
+        body: `<p>¿Eliminar el registro de ${normalizeBranchName(record.sucursal)} del ${formatDisplayDate(record.fecha)}?</p>`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        showCancel: true,
+        onConfirm: async () => {
+          try {
+            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            await renderAnalytics();
+            await renderDashboard();
+            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+          } catch (err) {
+            showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
+          }
+        }
+      });
+    }));
+  }
 }
 
 async function renderDashboard() {
@@ -949,11 +1505,14 @@ async function getEmployees() {
   return getStoredEmployees();
 }
 
+let employeeCache = [];
+
 async function renderEmployees() {
   const list = document.getElementById('employeeList');
   if (!list) return;
 
   const employees = await getEmployees();
+  employeeCache = employees;
 
   if (!employees.length) {
     list.innerHTML = '<div class="empty-state">No hay empleados cargados.</div>';
@@ -1008,13 +1567,16 @@ async function renderEmployees() {
       if (hourlyRateField) hourlyRateField.value = employee.hourlyRate;
       if (phoneField) phoneField.value = employee.phone;
       const passField = document.getElementById('employeePassword');
+      const passWrap = document.querySelector('.employee-password-field');
       if (passField) passField.value = '';
+      if (passWrap) passWrap.classList.toggle('hidden', employee.role !== 'Encargado');
       if (notesField) notesField.value = employee.notes || '';
       if (notesWrap) notesWrap.classList.remove('hidden');
       if (formTitle) formTitle.textContent = 'Editar empleado';
 
       toggleSection('employees');
-      if (nameField) nameField.focus();
+      document.getElementById('employeeForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (nameField) nameField.focus({ preventScroll: true });
     });
   });
 
@@ -1072,7 +1634,9 @@ function initEmployeeForm() {
     event.preventDefault();
 
     const idField = document.getElementById('employeeId');
-    const existingEmployee = getStoredEmployees().find((item) => String(item.id) === String(idField?.value || ''));
+    const editingId = idField?.value || '';
+    const existingEmployee = employeeCache.find((item) => String(item.id) === String(editingId))
+      || getStoredEmployees().find((item) => String(item.id) === String(editingId));
     const payload = {
       name: document.getElementById('employeeName').value.trim(),
       lastName: document.getElementById('employeeLastName').value.trim(),
@@ -1107,27 +1671,38 @@ function initEmployeeForm() {
 
     try {
       const sessionState = sessionStorage.getItem(SESSION_KEY);
+      const employeeId = Number(idField?.value) || Date.now();
+      const employeeRecord = {
+        id: employeeId,
+        ...payload
+      };
+
       if (sessionState) {
         // If creating a new Encargado while connected to server, require a password
         if (payload.role === 'Encargado' && !(idField && idField.value) && (!passInput || !passInput.value.trim())) {
           showNotice('Contraseña requerida', 'Debés asignar una contraseña al crear un Encargado.', 'error');
           return;
         }
+
         const url = idField && idField.value ? `/api/employees/${idField.value}` : '/api/employees';
         const method = idField && idField.value ? 'PUT' : 'POST';
-        await fetchJson(url, {
-          method,
-          body: JSON.stringify(payload)
-        });
+
+        try {
+          await fetchJson(url, {
+            method,
+            body: JSON.stringify(payload)
+          });
+          syncEmployeeLocalData(employeeRecord, employeeId);
+        } catch (error) {
+          syncEmployeeLocalData(employeeRecord, employeeId);
+          form.reset();
+          if (idField) idField.value = '';
+          await renderEmployees();
+          showNotice('No se pudo enviar o cargar los datos', 'No se pudo enviar o cargar los datos.', 'error');
+          return;
+        }
       } else {
-        const existing = getStoredEmployees();
-        const employee = {
-          id: Number(idField?.value) || Date.now(),
-          ...payload
-        };
-        const next = existing.filter((item) => String(item.id) !== String(employee.id));
-        next.push(employee);
-        saveStoredEmployees(next);
+        syncEmployeeLocalData(employeeRecord, employeeId);
       }
 
       form.reset();
@@ -1144,9 +1719,11 @@ function initEmployeeForm() {
     form.reset();
     const idField = document.getElementById('employeeId');
     const notesWrap = document.querySelector('.employee-notes-field');
+    const passWrap = document.querySelector('.employee-password-field');
     const formTitle = document.getElementById('employeeFormTitle');
     if (idField) idField.value = '';
     if (notesWrap) notesWrap.classList.add('hidden');
+    if (passWrap) passWrap.classList.toggle('hidden', document.getElementById('employeeRole')?.value !== 'Encargado');
     if (formTitle) formTitle.textContent = 'Agregar empleado';
   });
 }
@@ -1174,13 +1751,13 @@ function initLoginPage() {
         } else {
           sessionStorage.setItem(SESSION_KEY, user.username || 'admin');
         }
-        window.location.href = data.redirect || '/admin/employee-dashboard.html';
+        window.location.href = data.redirect || 'employee-dashboard.html';
       }
     } catch (error) {
       const adminMatch = ADMIN_USERS.find((u) => u.username === username && u.password === password);
       if (adminMatch) {
         sessionStorage.setItem(SESSION_KEY, adminMatch.username);
-        window.location.href = '/admin/employee-dashboard.html';
+        window.location.href = 'employee-dashboard.html';
         return;
       }
 
@@ -1188,7 +1765,7 @@ function initLoginPage() {
       const encargado = employees.find((e) => e.phone === username && e.password === password && e.role === 'Encargado');
       if (encargado) {
         sessionStorage.setItem(SESSION_KEY, `encargado:${encargado.phone}`);
-        window.location.href = '/admin/encargado.html';
+        window.location.href = 'encargado.html';
         return;
       }
 
@@ -1202,7 +1779,7 @@ function initLoginPage() {
 async function initDashboardPage() {
   const sessionUser = await syncSessionFromServer();
   if (!sessionUser) {
-    window.location.href = '/admin/index.html';
+    window.location.href = 'index.html';
     return;
   }
 
@@ -1215,7 +1792,7 @@ async function initDashboardPage() {
     }
 
     sessionStorage.removeItem(SESSION_KEY);
-    window.location.href = '/admin/index.html';
+    window.location.href = 'index.html';
   });
 
   document.querySelectorAll('.nav-link').forEach((button) => {
@@ -1240,12 +1817,28 @@ async function initDashboardPage() {
   const transferInput = document.getElementById('transferInput');
   const qrInput = document.getElementById('qrInput');
   const pedidosInput = document.getElementById('pedidosYaInput');
-  [cashInput, transferInput, qrInput, pedidosInput].forEach((input) => {
+  const tiraxyInput = document.getElementById('tiraxyInput');
+  const tiraxyInputGroup = document.getElementById('tiraxyInputGroup');
+  [cashInput, transferInput, qrInput, pedidosInput, tiraxyInput].forEach((input) => {
     input?.addEventListener('input', () => {
       const sanitized = sanitizeNumber(input.value);
       input.value = sanitized;
     });
   });
+
+  const branchSelect = document.getElementById('branchSelect');
+  const updateTiraxyVisibility = () => {
+    const visible = branchSelect?.value === 'Alvear';
+    if (tiraxyInputGroup) {
+      tiraxyInputGroup.style.display = visible ? 'block' : 'none';
+    }
+    if (!visible && tiraxyInput) {
+      tiraxyInput.value = '0';
+    }
+    renderBranchSummary(getStoredRecords());
+  };
+  branchSelect?.addEventListener('change', updateTiraxyVisibility);
+  updateTiraxyVisibility();
 
   const dayFilter = document.getElementById('dayFilter');
   const chartStart = document.getElementById('chartStart');
@@ -1288,6 +1881,9 @@ async function initDashboardPage() {
   analyticsFromDate?.addEventListener('change', refreshAnalyticsCustomRange);
   analyticsToDate?.addEventListener('change', refreshAnalyticsCustomRange);
 
+  const exportBtn = document.getElementById('exportAnalyticsPdfBtn');
+  exportBtn?.addEventListener('click', exportAnalyticsPdf);
+
   const form = document.getElementById('incomeForm');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1298,6 +1894,7 @@ async function initDashboardPage() {
     const transferencias = Number(sanitizeNumber(document.getElementById('transferInput').value));
     const qr = Number(sanitizeNumber(document.getElementById('qrInput').value));
     const pedidosYa = Number(sanitizeNumber(document.getElementById('pedidosYaInput')?.value || 0));
+    const tiraxy = Number(sanitizeNumber(document.getElementById('tiraxyInput')?.value || 0));
     const stock = (document.getElementById('stockInput')?.value || '').trim();
     const notas = document.getElementById('notesInput').value.trim();
 
@@ -1307,7 +1904,7 @@ async function initDashboardPage() {
         await fetchJson('/api/records', {
           method: 'POST',
           credentials: 'include',
-          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, notas, stock })
+          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, tiraxy, notas, stock })
         });
       } else {
         const allRecords = getStoredRecords();
@@ -1321,9 +1918,10 @@ async function initDashboardPage() {
           transferencias,
           qr,
           pedidosYa,
+          tiraxy,
           notas,
           stock,
-          total: efectivo + transferencias + qr + pedidosYa
+          total: efectivo + transferencias + qr + pedidosYa + tiraxy
         });
         saveStoredRecords(allRecords);
       }

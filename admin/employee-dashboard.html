@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TAZ Admin · Empleados</title>
-<link rel="shortcut icon" href="img/logo-red.svg" />
+<link rel="shortcut icon" href="../img/logo-red.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="./admin.css">
 </head>
 <body class="admin-dashboard-page">
   <aside class="sidebar">
@@ -55,8 +55,9 @@
               <div class="field-group">
                 <label for="branchSelect">Sucursal</label>
                 <select id="branchSelect" required>
+                  <option value="Alvear">Alvear</option>
                   <option value="Centro">Centro</option>
-                  <option value="Nieva">Nieva</option>
+                  <option value="Ciudad de Nieva">Ciudad de Nieva</option>
                   <option value="Alto Comedero">Alto Comedero</option>
                   <option value="Hattogu">Hattogu</option>
                 </select>
@@ -75,13 +76,18 @@
               </div>
 
               <div class="field-group">
-                <label for="qrInput">QR</label>
+                <label for="qrInput">Tarjeta / QR</label>
                 <input type="text" id="qrInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
               </div>
 
               <div class="field-group">
                 <label for="pedidosYaInput">PedidosYa</label>
                 <input type="text" id="pedidosYaInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
+              </div>
+
+              <div class="field-group" id="tiraxyInputGroup" style="display:none;">
+                <label for="tiraxyInput">Tiraxy</label>
+                <input type="text" id="tiraxyInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
               </div>
             </div>
 
@@ -137,6 +143,7 @@
                   <th>Transferencias</th>
                   <th>QR</th>
                   <th>PedidosYa</th>
+                  <th>Tiraxy</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -189,6 +196,7 @@
                   <th>Transferencias</th>
                   <th>QR</th>
                   <th>PedidosYa</th>
+                  <th>Tiraxy</th>
                   <th>Total</th>
                   <th>Notas</th>
                   <th>Stock</th>
@@ -225,9 +233,11 @@
                   <th>Transferencias</th>
                   <th>QR</th>
                   <th>PedidosYa</th>
+                  <th>Tiraxy</th>
                   <th>Total</th>
                   <th>Notas</th>
                   <th>Stock</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="dailyRecordsTable"></tbody>
@@ -284,6 +294,7 @@
                 <div class="analytics-custom-range">
                   <input type="date" id="analyticsFromDate">
                   <input type="date" id="analyticsToDate">
+                  <button type="button" class="primary-btn" id="exportAnalyticsPdfBtn">Exportar PDF</button>
                 </div>
               </div>
             </div>
@@ -311,9 +322,11 @@
                     <th>Transferencias</th>
                     <th>QR</th>
                     <th>PedidosYa</th>
+                    <th>Tiraxy</th>
                     <th>Total</th>
                     <th>Notas</th>
                     <th>Stock</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="analyticsRecordsTable"></tbody>
@@ -412,6 +425,7 @@
     </div>
   </div>
 
-  <script src="admin.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="./admin.js"></script>
 </body>
 </html>
