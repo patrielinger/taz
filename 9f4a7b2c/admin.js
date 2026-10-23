@@ -1550,6 +1550,9 @@ async function renderEmployees() {
       const employee = employees.find((item) => String(item.id) === String(button.dataset.id));
       if (!employee) return;
 
+      const form = document.getElementById('employeeForm');
+      if (form) form.reset();
+
       const idField = document.getElementById('employeeId');
       const nameField = document.getElementById('employeeName');
       const lastNameField = document.getElementById('employeeLastName');
@@ -1559,20 +1562,24 @@ async function renderEmployees() {
       const notesField = document.getElementById('employeeNotes');
       const formTitle = document.getElementById('employeeFormTitle');
       const notesWrap = document.querySelector('.employee-notes-field');
-
-      if (idField) idField.value = employee.id;
-      if (nameField) nameField.value = employee.name;
-      if (lastNameField) lastNameField.value = employee.lastName;
-      if (roleField) roleField.value = employee.role;
-      if (hourlyRateField) hourlyRateField.value = employee.hourlyRate;
-      if (phoneField) phoneField.value = employee.phone;
       const passField = document.getElementById('employeePassword');
       const passWrap = document.querySelector('.employee-password-field');
+
+      if (idField) idField.value = employee.id;
+      if (nameField) nameField.value = employee.name || '';
+      if (lastNameField) lastNameField.value = employee.lastName || '';
+      if (roleField) roleField.value = employee.role || 'Empleado';
+      if (hourlyRateField) hourlyRateField.value = employee.hourlyRate ?? 0;
+      if (phoneField) phoneField.value = employee.phone || '';
       if (passField) passField.value = '';
-      if (passWrap) passWrap.classList.toggle('hidden', employee.role !== 'Encargado');
       if (notesField) notesField.value = employee.notes || '';
-      if (notesWrap) notesWrap.classList.remove('hidden');
+      if (passWrap) passWrap.classList.toggle('hidden', (employee.role || 'Empleado') !== 'Encargado');
+      if (notesWrap) notesWrap.classList.toggle('hidden', !((employee.notes || '').trim()));
       if (formTitle) formTitle.textContent = 'Editar empleado';
+
+      if (roleField) {
+        roleField.dispatchEvent(new Event('change'));
+      }
 
       toggleSection('employees');
       document.getElementById('employeeForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
