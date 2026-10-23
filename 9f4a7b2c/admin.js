@@ -86,6 +86,24 @@ function saveStoredEmployees(employees) {
   localStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
 }
 
+function syncEmployeeLocalData(employee, fallbackId = null) {
+  const storedEmployees = getStoredEmployees();
+  const employeeId = employee.id ?? employee.employee_id ?? employee.employeeId ?? fallbackId ?? Date.now();
+  const normalized = normalizeEmployee({
+    ...employee,
+    id: employeeId,
+    lastName: employee.lastName ?? employee.last_name ?? '',
+    hourlyRate: employee.hourlyRate ?? employee.hourly_rate ?? 0,
+    password: employee.password ?? employee.password_hash ?? ''
+  });
+
+  const nextEmployees = storedEmployees.filter((item) => String(item.id) !== String(employeeId));
+  nextEmployees.push(normalized);
+  saveStoredEmployees(nextEmployees);
+  employeeCache = nextEmployees;
+  return normalized;
+}
+
 function normalizeEmployee(row) {
   return {
     id: row.id ?? row.employee_id ?? row.employeeId,
@@ -1653,27 +1671,38 @@ function initEmployeeForm() {
 
     try {
       const sessionState = sessionStorage.getItem(SESSION_KEY);
+      const employeeId = Number(idField?.value) || Date.now();
+      const employeeRecord = {
+        id: employeeId,
+        ...payload
+      };
+
       if (sessionState) {
         // If creating a new Encargado while connected to server, require a password
         if (payload.role === 'Encargado' && !(idField && idField.value) && (!passInput || !passInput.value.trim())) {
           showNotice('Contraseña requerida', 'Debés asignar una contraseña al crear un Encargado.', 'error');
           return;
         }
+
         const url = idField && idField.value ? `/api/employees/${idField.value}` : '/api/employees';
         const method = idField && idField.value ? 'PUT' : 'POST';
-        await fetchJson(url, {
-          method,
-          body: JSON.stringify(payload)
-        });
+
+        try {
+          await fetchJson(url, {
+            method,
+            body: JSON.stringify(payload)
+          });
+          syncEmployeeLocalData(employeeRecord, employeeId);
+        } catch (error) {
+          syncEmployeeLocalData(employeeRecord, employeeId);
+          form.reset();
+          if (idField) idField.value = '';
+          await renderEmployees();
+          showNotice('No se pudo enviar o cargar los datos', 'No se pudo enviar o cargar los datos.', 'error');
+          return;
+        }
       } else {
-        const existing = getStoredEmployees();
-        const employee = {
-          id: Number(idField?.value) || Date.now(),
-          ...payload
-        };
-        const next = existing.filter((item) => String(item.id) !== String(employee.id));
-        next.push(employee);
-        saveStoredEmployees(next);
+        syncEmployeeLocalData(employeeRecord, employeeId);
       }
 
       form.reset();
