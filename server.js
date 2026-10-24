@@ -531,11 +531,114 @@ async function initDatabase() {
 
 let pool;
 
+function getRecordTotal(record = {}) {
+  return Number(
+    record.total ?? (
+      Number(record.efectivo || 0) +
+      Number(record.transferencias || 0) +
+      Number(record.qr || 0) +
+      Number(record.pedidosYa ?? record.pedidos_ya ?? 0) +
+      Number(record.tiraxy || 0)
+    )
+  );
+}
+
+function isCountableRecord(record = {}) {
+  const rawState = String(record.estado ?? record.status ?? '').trim().toUpperCase();
+  return rawState !== 'Z';
+}
+
+function normalizeRecordRow(record = {}) {
+  return {
+    id: record.id ?? record.record_id ?? record.recordId,
+    fecha: record.fecha || '',
+    hora: record.hora || (
+      record.created_at
+        ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false })
+        : '00:00:00'
+    ),
+    usuario: record.usuario || record.user || 'Sin usuario',
+    sucursal: record.sucursal || 'Centro',
+    efectivo: Number(record.efectivo || 0),
+    transferencias: Number(record.transferencias || 0),
+    qr: Number(record.qr || 0),
+    pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
+    tiraxy: Number(record.tiraxy || 0),
+    notas: record.notas || '',
+    stock: record.stock || '',
+    total: getRecordTotal(record),
+    created_at: record.created_at || new Date().toISOString(),
+    estado: record.estado || record.status || ''
+  };
+}
+
+async function syncRecordsJsonFromDatabase() {
+  if (!pool) {
+    throw new Error('Base de datos no disponible.');
+  }
+
+  const [rows] = await pool.execute(`
+    SELECT
+      id,
+      fecha,
+      sucursal,
+      efectivo,
+      transferencias,
+      qr,
+      pedidos_ya AS pedidosYa,
+      tiraxy,
+      total,
+      notas,
+      stock,
+      usuario,
+      created_at,
+      NULL AS estado
+    FROM records
+    ORDER BY fecha DESC, created_at DESC, id DESC
+  `);
+
+  const normalizedRows = rows.map((row) => normalizeRecordRow(row));
+  const existingRaw = await readJsonFile('records.json');
+  const existing = Array.isArray(existingRaw) ? existingRaw : [];
+  const merged = new Map();
+
+  existing.forEach((record) => {
+    const key = String(record.id);
+    if (!key || key === 'undefined') return;
+    const normalized = normalizeRecordRow(record);
+    merged.set(key, { ...merged.get(key), ...normalized });
+  });
+
+  normalizedRows.forEach((record) => {
+    const key = String(record.id);
+    if (!key || key === 'undefined') return;
+    merged.set(key, { ...merged.get(key), ...record });
+  });
+
+  const nextRecords = Array.from(merged.values())
+    .filter((record) => record && record.id != null)
+    .sort((a, b) => {
+      const byDate = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+      if (byDate !== 0) return byDate;
+      const byCreated = String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      if (byCreated !== 0) return byCreated;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
+  await writeJsonFile('records.json', nextRecords);
+  return nextRecords;
+}
+
 (async () => {
 
   pool = await initDatabase();
 
-  console.log('MySQL ready.');
+  try {
+    await syncRecordsJsonFromDatabase();
+    console.log('MySQL ready.');
+  } catch (error) {
+    console.warn('MySQL ready, JSON sync skipped:', error.message || error);
+  }
 
 })();
 
@@ -865,7 +968,6 @@ app.post(
 
 
     const now = new Date();
-
     const hora =
       now.toLocaleTimeString(
         'es-AR',
@@ -873,8 +975,9 @@ app.post(
       );
 
 
-    const [result] =
-      await pool.execute(
+    let result;
+    try {
+      [result] = await pool.execute(
         `INSERT INTO records
         (
           fecha,
@@ -905,73 +1008,26 @@ app.post(
         ]
       );
 
-
-    try {
-
-      const insertId =
-        (
-          result &&
-          result.insertId
-        )
-          ? result.insertId
-          : Date.now();
-
-
-      const recordsJson =
-        await readJsonFile(
-          'records.json'
-        );
-
-
-      recordsJson.unshift({
-
-        id: insertId,
-        fecha,
-        hora,
-        usuario,
-        sucursal,
-        efectivo:
-          cleanAmounts.efectivo,
-        transferencias:
-          cleanAmounts.transferencias,
-        qr:
-          cleanAmounts.qr,
-        pedidosYa:
-          cleanAmounts.pedidosYa,
-        tiraxy:
-          cleanAmounts.tiraxy,
-        notas:
-          notas || '',
-        stock:
-          cleanAmounts.stock || '',
-        total,
-        created_at:
-          now.toISOString()
-
+      await syncRecordsJsonFromDatabase();
+    } catch (error) {
+      console.error('Error creating record:', error);
+      return res.status(500).json({
+        ok: false,
+        message: 'Error al guardar el registro en la base de datos.'
       });
-
-
-      await writeJsonFile(
-        'records.json',
-        recordsJson
-      );
-
-
-    } catch (err) {
-
-      console.warn(
-        'Could not write records.json:',
-        err.message || err
-      );
     }
 
+    const insertId =
+      (result && result.insertId)
+        ? result.insertId
+        : Date.now();
 
     res
       .status(201)
       .json({
         ok: true,
-        message:
-          'Registro guardado correctamente.'
+        message: 'Registro guardado correctamente.',
+        id: insertId
       });
 
   }
@@ -983,12 +1039,38 @@ app.get(
   ensureAuth,
   async (req, res) => {
 
-    const records =
-      await readJsonFile(
-        'records.json'
-      );
+    try {
+      const [rows] = await pool.execute(`
+        SELECT
+          id,
+          fecha,
+          sucursal,
+          efectivo,
+          transferencias,
+          qr,
+          pedidos_ya AS pedidosYa,
+          tiraxy,
+          total,
+          notas,
+          stock,
+          usuario,
+          created_at,
+          NULL AS estado
+        FROM records
+        ORDER BY fecha DESC, created_at DESC, id DESC
+      `);
 
-    res.json(records);
+      const records = rows.map((row) => normalizeRecordRow(row));
+      await syncRecordsJsonFromDatabase();
+      return res.json(records);
+    } catch (error) {
+      const fallbackRecords = await readJsonFile('records.json');
+      return res.status(503).json({
+        ok: false,
+        message: 'Base de datos no disponible. No se pudo completar la consulta.',
+        records: Array.isArray(fallbackRecords) ? fallbackRecords : []
+      });
+    }
 
   }
 );
@@ -1027,7 +1109,8 @@ app.put(
       pedidosYa,
       tiraxy,
       notas,
-      stock
+      stock,
+      estado
     } = req.body;
 
 
@@ -1050,117 +1133,48 @@ app.put(
       );
 
 
-    await pool.execute(
-      `UPDATE records
-       SET fecha = ?,
-           sucursal = ?,
-           efectivo = ?,
-           transferencias = ?,
-           qr = ?,
-           pedidos_ya = ?,
-           tiraxy = ?,
-           total = ?,
-           notas = ?,
-           stock = ?
-       WHERE id = ?`,
-      [
-        fecha,
-        sucursal,
-        Number(efectivo || 0),
-        Number(transferencias || 0),
-        Number(qr || 0),
-        pedidosValue,
-        tiraxyValue,
-        totalValue,
-        notas || '',
-        stock || '',
-        id
-      ]
-    );
-
-
     try {
-
-      const recs =
-        await readJsonFile(
-          'records.json'
-        );
-
-
-      const idx =
-        recs.findIndex(
-          (r) =>
-            String(r.id) ===
-            String(id)
-        );
-
-
-      const total =
-        Number(efectivo || 0) +
-        Number(transferencias || 0) +
-        Number(qr || 0) +
-        Number(pedidosYa || 0) +
-        Number(tiraxy || 0);
-
-
-      if (idx !== -1) {
-
-        recs[idx] = {
-
-          ...recs[idx],
-
+      await pool.execute(
+        `UPDATE records
+         SET fecha = ?,
+             sucursal = ?,
+             efectivo = ?,
+             transferencias = ?,
+             qr = ?,
+             pedidos_ya = ?,
+             tiraxy = ?,
+             total = ?,
+             notas = ?,
+             stock = ?
+         WHERE id = ?`,
+        [
           fecha,
           sucursal,
-
-          efectivo:
-            Number(efectivo || 0),
-
-          transferencias:
-            Number(
-              transferencias || 0
-            ),
-
-          qr:
-            Number(qr || 0),
-
-          pedidosYa:
-            Number(pedidosYa || 0),
-
-          tiraxy:
-            Number(tiraxy || 0),
-
-          total,
-
-          notas:
-            notas || '',
-
-          stock:
-            stock || ''
-
-        };
-
-
-        await writeJsonFile(
-          'records.json',
-          recs
-        );
-      }
-
-
-    } catch (err) {
-
-      console.warn(
-        'Could not update records.json:',
-        err.message || err
+          Number(efectivo || 0),
+          Number(transferencias || 0),
+          Number(qr || 0),
+          pedidosValue,
+          tiraxyValue,
+          totalValue,
+          notas || '',
+          stock || '',
+          id
+        ]
       );
+
+      await syncRecordsJsonFromDatabase();
+      return res.json({
+        ok: true,
+        message: 'Registro actualizado correctamente.',
+        estado: estado || ''
+      });
+    } catch (error) {
+      console.error('Error updating record:', error);
+      return res.status(500).json({
+        ok: false,
+        message: 'No se pudo actualizar el registro en la base de datos.'
+      });
     }
-
-
-    res.json({
-      ok: true,
-      message:
-        'Registro actualizado correctamente.'
-    });
 
   }
 );
@@ -1174,49 +1188,24 @@ app.delete(
 
     const { id } = req.params;
 
-
-    await pool.execute(
-      'DELETE FROM records WHERE id = ?',
-      [id]
-    );
-
-
     try {
-
-      const recs =
-        await readJsonFile(
-          'records.json'
-        );
-
-
-      const next =
-        recs.filter(
-          (e) =>
-            String(e.id) !==
-            String(id)
-        );
-
-
-      await writeJsonFile(
-        'records.json',
-        next
+      await pool.execute(
+        'DELETE FROM records WHERE id = ?',
+        [id]
       );
 
-
-    } catch (err) {
-
-      console.warn(
-        'Could not update records.json after delete:',
-        err.message || err
-      );
+      await syncRecordsJsonFromDatabase();
+      return res.json({
+        ok: true,
+        message: 'Registro eliminado correctamente.'
+      });
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      return res.status(500).json({
+        ok: false,
+        message: 'No se pudo eliminar el registro en la base de datos.'
+      });
     }
-
-
-    res.json({
-      ok: true,
-      message:
-        'Registro eliminado correctamente.'
-    });
 
   }
 );

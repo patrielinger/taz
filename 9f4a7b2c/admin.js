@@ -20,6 +20,11 @@ function normalizeBranchName(branch) {
   return map[value] || value;
 }
 
+function isCountableRecord(record = {}) {
+  const state = String(record.estado ?? record.status ?? '').trim().toUpperCase();
+  return state !== 'Z';
+}
+
 function ensureDemoData() {
   const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
   if (records && records.length) return records;
@@ -210,7 +215,7 @@ function renderBranchSummary(records) {
 
   if (!rows) return;
 
-  const dayRecords = getSelectedDayRecords(records, day);
+  const dayRecords = getSelectedDayRecords(records, day).filter(isCountableRecord);
   const totals = BRANCHES.map((branch) => {
     const filtered = dayRecords.filter((record) => normalizeBranchName(record.sucursal) === branch);
     return {
@@ -246,7 +251,7 @@ function renderBranchSummary(records) {
     monthStart.setDate(1);
     const monthKey = monthStart.toISOString().slice(0, 7);
     const monthSum = records
-      .filter((record) => record.fecha.startsWith(monthKey))
+      .filter((record) => record.fecha.startsWith(monthKey) && isCountableRecord(record))
       .reduce((sum, record) => sum + Number(record.total || 0), 0);
     monthTotalEl.textContent = money(monthSum);
   }
@@ -260,6 +265,27 @@ function renderBranchSummary(records) {
     const avg = selectedBranchRecords.length ? selectedBranchTotal / selectedBranchRecords.length : 0;
     branchAverageEl.textContent = money(avg);
   }
+}
+
+async function verifyRecordPersistedOnServer(id, payload) {
+  const records = await fetchJson('/api/records');
+  if (!Array.isArray(records)) return false;
+
+  return records.some((record) => {
+    if (String(record.id) !== String(id)) return false;
+
+    const sameDate = String(record.fecha || '') === String(payload.fecha || '');
+    const sameBranch = String(record.sucursal || '') === String(payload.sucursal || '');
+    const sameEfectivo = Number(record.efectivo || 0) === Number(payload.efectivo || 0);
+    const sameTransferencias = Number(record.transferencias || 0) === Number(payload.transferencias || 0);
+    const sameQr = Number(record.qr || 0) === Number(payload.qr || 0);
+    const samePedidosYa = Number(record.pedidosYa ?? record.pedidos_ya ?? 0) === Number(payload.pedidosYa || 0);
+    const sameTiraxy = Number(record.tiraxy || 0) === Number(payload.tiraxy || 0);
+    const sameNotas = String(record.notas || '') === String(payload.notas || '');
+    const sameStock = String(record.stock || '') === String(payload.stock || '');
+
+    return sameDate && sameBranch && sameEfectivo && sameTransferencias && sameQr && samePedidosYa && sameTiraxy && sameNotas && sameStock;
+  });
 }
 
 async function persistRecordUpdate(id, payload) {
@@ -300,11 +326,16 @@ async function persistRecordUpdate(id, payload) {
       })
     });
 
+    const persisted = await verifyRecordPersistedOnServer(id, payload);
+    if (!persisted) {
+      throw new Error('La actualización no quedó confirmada por el servidor.');
+    }
+
     saveStoredRecords(nextRecords);
     return response;
   } catch (error) {
     saveStoredRecords(nextRecords);
-    throw new Error('No se pudo enviar o cargar los datos');
+    throw new Error(error.message || 'No se pudo enviar o cargar los datos');
   }
 }
 
@@ -908,6 +939,7 @@ async function loadRecords() {
         pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
         notas: record.notas || '',
         stock: record.stock || '',
+        estado: record.estado || record.status || '',
         total: Number(record.total || 0),
         created_at: record.created_at || null
       }));
@@ -1255,8 +1287,10 @@ async function renderAnalytics() {
   const monthRecords = source.filter((record) => record.fecha && record.fecha.startsWith(today.toISOString().slice(0, 7)));
   const selectedRecords = [...rangeRecords].sort((a, b) => String(b.id).localeCompare(String(a.id)));
 
-  const rangeTotalValue = rangeRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
-  const monthTotalValue = monthRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const countableRangeRecords = rangeRecords.filter(isCountableRecord);
+  const countableMonthRecords = monthRecords.filter(isCountableRecord);
+  const rangeTotalValue = countableRangeRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const monthTotalValue = countableMonthRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
   const daysInRange = Math.max(1, Math.round((end - start) / 86400000) + 1);
   const avgValue = rangeTotalValue / daysInRange;
 
@@ -1423,6 +1457,27 @@ function toggleSection(sectionName) {
   if (sectionName === 'statistics') {
     renderAnalytics();
   }
+}
+
+async function verifyEmployeePersistedOnServer(id, payload) {
+  const employees = await fetchJson('/api/employees');
+  if (!Array.isArray(employees)) return false;
+
+  return employees.some((employee) => {
+    if (String(employee.id) !== String(id)) return false;
+
+    const fields = {
+      name: String(employee.name || '') === String(payload.name || ''),
+      lastName: String(employee.lastName || employee.last_name || '') === String(payload.lastName || ''),
+      role: String(employee.role || '') === String(payload.role || ''),
+      phone: String(employee.phone || '') === String(payload.phone || ''),
+      notes: String(employee.notes || '') === String(payload.notes || ''),
+      hourlyRate: Number(employee.hourlyRate ?? employee.hourly_rate ?? 0) === Number(payload.hourlyRate || 0),
+      branch: String(employee.branch || '') === String(payload.branch || 'Centro')
+    };
+
+    return Object.values(fields).every(Boolean);
+  });
 }
 
 async function getEmployees() {
@@ -1631,17 +1686,26 @@ function initEmployeeForm() {
         const method = idField && idField.value ? 'PUT' : 'POST';
 
         try {
-          await fetchJson(url, {
+          const response = await fetchJson(url, {
             method,
             body: JSON.stringify(payload)
           });
+
+          const confirmed = await verifyEmployeePersistedOnServer(employeeId, payload);
+          if (!confirmed) {
+            throw new Error('La edición no quedó confirmada por el servidor.');
+          }
+
           syncEmployeeLocalData(employeeRecord, employeeId);
+          if (response && response.ok === false) {
+            throw new Error(response.message || 'La respuesta del servidor no es válida.');
+          }
         } catch (error) {
           syncEmployeeLocalData(employeeRecord, employeeId);
           form.reset();
           if (idField) idField.value = '';
           await renderEmployees();
-          showNotice('No se pudo enviar o cargar los datos', 'No se pudo enviar o cargar los datos.', 'error');
+          showNotice('No se pudo enviar o cargar los datos', error.message || 'No se pudo enviar o cargar los datos.', 'error');
           return;
         }
       } else {
