@@ -97,9 +97,6 @@ canvas { width: 100%; height: 240px; display: block; touch-action: pan-y; }
 .sheet footer .tot { margin-right: auto; display: grid; line-height: 1.1; }
 .sheet footer .tot span { color: var(--muted); font-size: 15px; }
 .sheet footer .tot b { font-size: 28px; }
-.check { display: flex !important; grid-template-columns: none; align-items: flex-start; gap: 10px; color: var(--text) !important; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; }
-.check input { width: 20px; min-height: 20px; margin-top: 2px; accent-color: var(--amber); }
-.check small { color: var(--muted); display: block; }
 
 dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; max-width: 420px; }
 dialog::backdrop { background: rgba(0,0,0,.65); }

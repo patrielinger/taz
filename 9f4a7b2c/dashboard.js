@@ -136,9 +136,12 @@
     const s = series(ok, from, to);
     chart($('statsChart'), s.labels, s.values);
 
-    $('mixList').innerHTML = T.FIELDS.map(([k, l]) => {
-      const v = sum(ok, k), p = total ? Math.round((v / total) * 100) : 0;
-      return `<li><span>${l}</span><span>${T.money(v)} (${p}%)</span><i style="--p:${p}%"></i></li>`;
+    $('mixList').innerHTML = T.FIELDS.map((f) => {
+      const [k, l] = f, v = sum(ok, k), p = total ? Math.round((v / total) * 100) : 0;
+      // El Z se informa aparte: no forma parte del total ni de los porcentajes.
+      return T.counts(f)
+        ? `<li><span>${l}</span><span>${T.money(v)} (${p}%)</span><i style="--p:${p}%"></i></li>`
+        : `<li><span>${l}</span><span>${T.money(v)}</span></li>`;
     }).join('');
 
     const weeks = {};
@@ -189,13 +192,11 @@
 
   /* ---------- hoja de registro (crear y editar) ---------- */
   const sheet = $('sheet');
-  $('moneyFields').innerHTML = T.FIELDS.map(([k, l]) => `<label>${l}<input id="f_${k}" inputmode="decimal" placeholder="0"></label>`).join('');
-  const typed = () => T.FIELDS.reduce((s, [k]) => s + T.amount($(`f_${k}`).value), 0);
+  $('moneyFields').innerHTML = T.FIELDS.map(([k, l]) => `<label>${l}<input id="f_${k}" inputmode="decimal" placeholder="0"${k === 'qr' ? ' required' : ''}></label>`).join('');
+  const typed = () => T.FIELDS.filter(T.counts).reduce((s, [k]) => s + T.amount($(`f_${k}`).value), 0);
 
   function paintTotal() {
-    const z = $('fZ').checked;
     $('fTotal').textContent = T.money(typed());
-    $('fTotLabel').textContent = z ? 'Total (no suma a los totales)' : 'Total del registro';
   }
 
   function openSheet(rec) {
@@ -212,7 +213,6 @@
     T.FIELDS.forEach(([k]) => { $(`f_${k}`).value = rec ? String(Number(rec[k]) || 0) : ''; });
     $('fNotas').value = rec ? rec.notas || '' : '';
     $('fStock').value = rec ? rec.stock || '' : '';
-    $('fZ').checked = !!rec && rec.countable === false;
     paintTotal();
     sheet.classList.add('open'); $('veil').classList.add('open'); sheet.setAttribute('aria-hidden', 'false');
     $('fFecha').focus();
@@ -228,10 +228,8 @@
     const hora = $('fHora').value;
     const body = { fecha: $('fFecha').value, sucursal: $('fSuc').value, notas: $('fNotas').value.trim(), stock: $('fStock').value.trim() };
     T.FIELDS.forEach(([k]) => { body[k] = T.amount($(`f_${k}`).value); });
-    // La hora y el estado solo se envían si cambiaron: no pisan lo que ya estaba guardado.
+    // La hora solo se envía si cambió: no pisa la que ya estaba guardada.
     if (!editing || hora !== String(editing.hora || '').slice(0, 5)) body.hora = hora;
-    const wasZ = !!editing && editing.countable === false;
-    if ($('fZ').checked !== wasZ) body.estado = $('fZ').checked ? 'Z (encQR)' : '';
 
     const btn = $('sheetSave');
     btn.disabled = true;

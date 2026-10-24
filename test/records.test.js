@@ -98,6 +98,14 @@ function fakeExecute(sqlRaw, params = []) {
     db.records.push(row);
     return Promise.resolve([{ insertId: row.id, affectedRows: 1 }, []]);
   }
+  if (/^UPDATE records SET total = efectivo/.test(sql)) {
+    let n = 0;
+    db.records.forEach((r) => {
+      const t = dec(Number(r.efectivo) + Number(r.transferencias) + Number(r.pedidos_ya) + Number(r.tiraxy));
+      if (Number(r.total) !== Number(t)) { r.total = t; n += 1; }
+    });
+    return Promise.resolve([{ affectedRows: n }, []]);
+  }
   if (/^UPDATE records SET estado = \? WHERE id = \? AND/.test(sql)) {
     const r = db.records.find((x) => x.id === Number(params[1]));
     if (r && (!r.estado)) { r.estado = params[0]; return Promise.resolve([{ affectedRows: 1 }, []]); }
@@ -432,11 +440,11 @@ async function test(name, fn) {
     assert.strictEqual(row.hora, '21:45:00');
     assert.strictEqual(row.fecha, '2020-01-15');
     assert.strictEqual(row.sucursal, 'Hattogu');
-    assert.strictEqual(Number(row.total), 1239);
+    assert.strictEqual(Number(row.total), 1209, 'el Z no suma');
     const j = readJson().find((x) => x.id === c.json.id);
     assert.deepStrictEqual(
       [j.fecha, j.hora, j.sucursal, j.efectivo, j.transferencias, j.qr, j.pedidosYa, j.tiraxy, j.total],
-      ['2020-01-15', '21:45:00', 'Hattogu', 1000, 200, 30, 4, 5, 1239]
+      ['2020-01-15', '21:45:00', 'Hattogu', 1000, 200, 30, 4, 5, 1209]
     );
   });
   await test('editar sin enviar hora ni estado no los modifica', async () => {
@@ -453,6 +461,37 @@ async function test(name, fn) {
     assert.strictEqual(put.status, 400);
     assert.strictEqual(dbRow(c.json.id).hora, '11:00:00');
     assert.strictEqual(Number(dbRow(c.json.id).efectivo), 306);
+  });
+
+  console.log('\nEscenario I: el Z se carga pero nunca suma');
+  await test('al crear, el Z se guarda en la BD y en el JSON pero no entra en el total', async () => {
+    const r = await api('POST', '/api/records', base({ efectivo: 100, transferencias: 50, qr: 500, pedidosYa: 10, tiraxy: 5, notas: 'i-alta' }));
+    assert.strictEqual(r.status, 201);
+    const row = dbRow(r.json.id);
+    assert.strictEqual(Number(row.qr), 500);
+    assert.strictEqual(Number(row.total), 165);
+    const j = readJson().find((x) => x.id === r.json.id);
+    assert.deepStrictEqual([j.qr, j.total], [500, 165]);
+  });
+  await test('cambiar solo el Z no cambia el total', async () => {
+    const c = await api('POST', '/api/records', base({ efectivo: 80, qr: 10, notas: 'i-solo-z' }));
+    const put = await api('PUT', `/api/records/${c.json.id}`, base({ efectivo: 80, qr: 9999, notas: 'i-solo-z' }));
+    assert.strictEqual(put.status, 200);
+    assert.strictEqual(Number(dbRow(c.json.id).qr), 9999);
+    assert.strictEqual(Number(dbRow(c.json.id).total), 80);
+    assert.strictEqual(put.json.record.total, 80);
+  });
+  await test('un registro anterior cuyo total incluía el Z se corrige al sincronizar', async () => {
+    db.records.push({
+      id: db.nextId++, fecha: '2020-02-02', sucursal: 'Centro', efectivo: '100.00', transferencias: '0.00',
+      qr: '250.00', pedidos_ya: '0.00', tiraxy: '0.00', total: '350.00', notas: 'i-viejo', stock: '',
+      usuario: 'Seed', estado: '', created_at: new Date(Date.now() - 864e5).toISOString()
+    });
+    const id = db.records[db.records.length - 1].id;
+    assert.strictEqual((await api('POST', '/api/records/sync')).status, 200);
+    const j = readJson().find((x) => x.id === id);
+    assert.deepStrictEqual([j.qr, j.total], [250, 100]);
+    assert.strictEqual((await api('GET', '/api/records')).json.find((x) => x.id === id).total, 100);
   });
 
   const failed = results.filter(([ok]) => !ok).length;

@@ -11,9 +11,9 @@
 
   $('eSuc').innerHTML = T.BRANCHES.map((b) => `<option>${T.esc(b)}</option>`).join('');
   $('eSuc').value = myBranch;
-  $('moneyFields').innerHTML = T.FIELDS.map(([k, l]) => `<label id="g_${k}">${l}<input id="f_${k}" inputmode="decimal" placeholder="0"></label>`).join('');
+  $('moneyFields').innerHTML = T.FIELDS.map(([k, l]) => `<label id="g_${k}">${l}<input id="f_${k}" inputmode="decimal" placeholder="0"${k === 'qr' ? ' required' : ''}></label>`).join('');
 
-  const typed = () => T.FIELDS.reduce((s, [k]) => s + T.amount($(`f_${k}`).value), 0);
+  const typed = () => T.FIELDS.filter(T.counts).reduce((s, [k]) => s + T.amount($(`f_${k}`).value), 0);
   const paint = () => {
     const centro = $('eSuc').value === 'Centro'; // Tiraxy solo se usa en Centro
     $('g_tiraxy').hidden = !centro;

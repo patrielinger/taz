@@ -501,6 +501,29 @@ async function initDatabase() {
       }
 
 
+      // El Z (columna `qr`) no suma en ningún total: se corrige el `total` de lo ya cargado.
+      // Idempotente; el monto Z no se toca (total anterior = total nuevo + qr).
+      try {
+
+        const [fixed] = await pool.execute(
+          `UPDATE records
+           SET total = efectivo + transferencias + pedidos_ya + tiraxy
+           WHERE total <> efectivo + transferencias + pedidos_ya + tiraxy`
+        );
+
+        if (fixed && fixed.affectedRows) {
+          console.log(`Totales recalculados sin Z: ${fixed.affectedRows} registros.`);
+        }
+
+      } catch (err) {
+
+        console.warn(
+          'No se pudieron recalcular los totales sin Z:',
+          err.message || err
+        );
+      }
+
+
       const [adminRows] =
         await pool.execute(
           'SELECT * FROM admins WHERE username = ?',
@@ -628,9 +651,11 @@ let pool;
    REGISTROS: REGLAS CENTRALIZADAS
    ---------------------------------------------------------
    Regla de contabilización (única fuente de verdad):
-     total contabilizado = registros cuyo estado sea distinto de Z
-   El estado Z se carga, guarda y muestra normalmente; solo se
-   excluye del cálculo de totales.
+     total de un registro = efectivo + transferencias + pedidosYa + tiraxy
+   El monto Z (columna `qr`) se carga, guarda y muestra siempre, pero
+   NUNCA entra en ningún total.
+   Además, los registros con estado Z heredado se siguen mostrando
+   pero quedan fuera de los totales.
    ========================================================= */
 
 const RECORD_STATE_Z = 'Z (encQR)';
@@ -710,26 +735,24 @@ function normalizeRecordTime(value) {
   return m ? `${m[1].padStart(2, '0')}:${m[2]}:${m[3] || '00'}` : '';
 }
 
-function getRecordTotal(record = {}) {
-  return Number(
-    record.total ?? (
-      Number(record.efectivo || 0) +
-      Number(record.transferencias || 0) +
-      Number(record.qr || 0) +
-      Number(record.pedidosYa ?? record.pedidos_ya ?? 0) +
-      Number(record.tiraxy || 0)
-    )
-  );
-}
-
-function computeRecordTotal({ efectivo = 0, transferencias = 0, qr = 0, pedidosYa = 0, tiraxy = 0 } = {}) {
+// El total siempre se calcula a partir de los montos (nunca se confía en `total` guardado).
+// `qr` (el Z) queda afuera a propósito.
+function computeRecordTotal({ efectivo = 0, transferencias = 0, pedidosYa = 0, tiraxy = 0 } = {}) {
   return Number((
     Number(efectivo || 0) +
     Number(transferencias || 0) +
-    Number(qr || 0) +
     Number(pedidosYa || 0) +
     Number(tiraxy || 0)
   ).toFixed(2));
+}
+
+function getRecordTotal(record = {}) {
+  return computeRecordTotal({
+    efectivo: record.efectivo,
+    transferencias: record.transferencias,
+    pedidosYa: record.pedidosYa ?? record.pedidos_ya,
+    tiraxy: record.tiraxy
+  });
 }
 
 function isCountableRecord(record = {}) {

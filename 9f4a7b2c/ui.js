@@ -3,10 +3,11 @@ const TAZ = (() => {
   const BRANCHES = ['Centro', 'Ciudad de Nieva', 'Alto Comedero', 'Hattogu'];
   const ALIAS = { Alvear: 'Centro', Nieva: 'Ciudad de Nieva', 'Jatobú': 'Hattogu' };
   // Campos de dinero de un registro. En pantalla, "Z" es la columna `qr`.
+  const counts = (f) => f[2] !== false; // ¿este campo suma al total?
   const FIELDS = [
     ['efectivo', 'Efectivo'],
     ['transferencias', 'Transferencias / Tarjeta'],
-    ['qr', 'Z'],
+    ['qr', 'Z (no suma)', false], // se carga siempre, pero nunca entra en un total
     ['pedidosYa', 'PedidosYa'],
     ['tiraxy', 'Tiraxy']
   ];
@@ -89,5 +90,5 @@ const TAZ = (() => {
     location.href = 'index.html';
   }
 
-  return { BRANCHES, FIELDS, branch, esc, money, short, plural, amount, iso, addDays, weekStart, dmy, api, toast, ask, session, logout };
+  return { BRANCHES, FIELDS, counts, branch, esc, money, short, plural, amount, iso, addDays, weekStart, dmy, api, toast, ask, session, logout };
 })();

@@ -153,10 +153,9 @@
       <div class="money" id="moneyFields"></div>
       <label>Notas del día<textarea id="fNotas" rows="3"></textarea></label>
       <label>Stock / faltantes<textarea id="fStock" rows="3"></textarea></label>
-      <label class="check"><input type="checkbox" id="fZ"><span>No sumar a los totales (estado Z)<small>El registro se conserva y se muestra, pero queda fuera de promedios y totales.</small></span></label>
     </form>
     <footer>
-      <div class="tot"><span id="fTotLabel">Total del registro</span><b class="num" id="fTotal">$0</b></div>
+      <div class="tot"><span id="fTotLabel">Total del registro, sin Z</span><b class="num" id="fTotal">$0</b></div>
       <button class="btn" type="button" id="sheetCancel">Cancelar</button>
       <button class="btn red" type="submit" form="recForm" id="sheetSave">Guardar cambios</button>
     </footer>
