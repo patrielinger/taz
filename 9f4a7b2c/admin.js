@@ -88,49 +88,18 @@ function sumRecordTotal(records) {
   return getCountableRecords(records).reduce((sum, record) => sum + Number(record.total || 0), 0);
 }
 
-function ensureDemoData() {
-  const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-  if (records && records.length) return records;
-
-  const today = new Date();
-  const demoRecords = [];
-
-  for (let i = 0; i < 12; i += 1) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    const fecha = date.toISOString().slice(0, 10);
-
-    BRANCHES.forEach((branch, index) => {
-      const efectivo = 3000 + (i * 150) + index * 400;
-      const transferencias = 2000 + (i * 100) + index * 280;
-      const qr = 1500 + (i * 110) + index * 300;
-
-      demoRecords.push({
-        id: `${fecha}-${branch}`,
-        fecha,
-        hora: '19:30:00',
-        usuario: 'admin',
-        sucursal: branch,
-        efectivo,
-        transferencias,
-        qr,
-        notas: 'Registro demo inicial',
-        total: efectivo + transferencias + qr
-      });
-    });
-  }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(demoRecords));
-  return demoRecords;
+function getEmptyRecordList() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  return [];
 }
 
 function getStoredRecords() {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return ensureDemoData();
+  if (!stored) return getEmptyRecordList();
 
   try {
     const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return ensureDemoData();
+    if (!Array.isArray(parsed)) return getEmptyRecordList();
 
     return parsed.map((record) => ({
       ...record,
@@ -138,7 +107,7 @@ function getStoredRecords() {
       estado: normalizeRecordState(record.estado ?? record.status ?? record.state ?? '')
     }));
   } catch (error) {
-    return ensureDemoData();
+    return getEmptyRecordList();
   }
 }
 
