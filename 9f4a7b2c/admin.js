@@ -47,7 +47,7 @@ function ensureDemoData() {
         transferencias,
         qr,
         notas: 'Registro demo inicial',
-        total: efectivo + transferencias + qr
+        total: calculateRecordTotal({ efectivo, transferencias, qr, pedidosYa: 0, tiraxy: 0 })
       });
     });
   }
@@ -137,6 +137,13 @@ function sanitizeNumber(value) {
   return String(value || '').replace(/[^\d]/g, '') || '0';
 }
 
+function calculateRecordTotal(record = {}) {
+  return Number(record.efectivo || 0)
+    + Number(record.transferencias || 0)
+    + Number(record.pedidosYa ?? record.pedidos_ya ?? 0)
+    + Number(record.tiraxy || 0);
+}
+
 function money(value) {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -220,7 +227,7 @@ function renderBranchSummary(records) {
       qr: filtered.reduce((sum, item) => sum + Number(item.qr || 0), 0),
       pedidosYa: filtered.reduce((sum, item) => sum + Number(item.pedidosYa || item.pedidos_ya || 0), 0),
       tiraxy: filtered.reduce((sum, item) => sum + Number(item.tiraxy || 0), 0),
-      total: filtered.reduce((sum, item) => sum + Number(item.total || 0), 0)
+      total: filtered.reduce((sum, item) => sum + calculateRecordTotal(item), 0)
     };
   });
 
@@ -247,7 +254,7 @@ function renderBranchSummary(records) {
     const monthKey = monthStart.toISOString().slice(0, 7);
     const monthSum = records
       .filter((record) => record.fecha.startsWith(monthKey))
-      .reduce((sum, record) => sum + Number(record.total || 0), 0);
+      .reduce((sum, record) => sum + calculateRecordTotal(record), 0);
     monthTotalEl.textContent = money(monthSum);
   }
 
@@ -256,7 +263,7 @@ function renderBranchSummary(records) {
     const selectedBranchValue = document.getElementById('branchSelect')?.value || 'Centro';
     const selectedBranch = normalizeBranchName(selectedBranchValue);
     const selectedBranchRecords = dayRecords.filter((record) => normalizeBranchName(record.sucursal) === selectedBranch);
-    const selectedBranchTotal = selectedBranchRecords.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const selectedBranchTotal = selectedBranchRecords.reduce((sum, item) => sum + calculateRecordTotal(item), 0);
     const avg = selectedBranchRecords.length ? selectedBranchTotal / selectedBranchRecords.length : 0;
     branchAverageEl.textContent = money(avg);
   }
@@ -267,7 +274,13 @@ async function persistRecordUpdate(id, payload) {
   const nextRecords = currentRecords.map((record) => {
     if (String(record.id) !== String(id)) return record;
 
-    const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
+    const total = calculateRecordTotal({
+      efectivo: payload.efectivo,
+      transferencias: payload.transferencias,
+      qr: payload.qr,
+      pedidosYa: payload.pedidosYa,
+      tiraxy: payload.tiraxy
+    });
 
     return {
       ...record,
@@ -338,7 +351,7 @@ function renderRecords(records) {
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || 0)}</td>
       <td>${money(record.tiraxy || 0)}</td>
-      <td>${money(record.total)}</td>
+      <td>${money(calculateRecordTotal(record))}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
       <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
@@ -421,7 +434,7 @@ function renderLastRecord(records) {
   content.innerHTML = `
     <div><strong>${latest.sucursal}</strong> — ${latest.usuario} — ${formatDisplayDate(latest.fecha)} ${latest.hora}</div>
     <div>Efectivo: ${money(latest.efectivo)} — Transferencias: ${money(latest.transferencias)} — QR: ${money(latest.qr)} — PedidosYa: ${money(latest.pedidosYa || 0)} — Tiraxy: ${money(latest.tiraxy || 0)}</div>
-    <div>Total: ${money(latest.total)}</div>
+    <div>Total: ${money(calculateRecordTotal(latest))}</div>
     <div>Notas: ${latest.notas || '—'}</div>
     <div>Stock: ${latest.stock || '—'}</div>
   `;
@@ -661,7 +674,7 @@ async function renderRecordsByDate(date) {
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
       <td>${money(record.tiraxy || 0)}</td>
-      <td>${money(record.total)}</td>
+      <td>${money(calculateRecordTotal(record))}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
       <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
@@ -825,7 +838,7 @@ function drawChart(records) {
 
   const amounts = dates.map((date) => {
     const iso = date.toISOString().slice(0, 10);
-    return sourceRecords.filter((record) => record.fecha === iso).reduce((sum, record) => sum + Number(record.total || 0), 0);
+    return sourceRecords.filter((record) => record.fecha === iso).reduce((sum, record) => sum + calculateRecordTotal(record), 0);
   });
 
   const width = canvas.width;
@@ -908,7 +921,7 @@ async function loadRecords() {
         pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
         notas: record.notas || '',
         stock: record.stock || '',
-        total: Number(record.total || 0),
+        total: calculateRecordTotal(record),
         created_at: record.created_at || null
       }));
     }
@@ -1008,7 +1021,7 @@ function getAnalyticsExportRows() {
       qr: Number(record.qr || 0),
       pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
       tiraxy: Number(record.tiraxy || 0),
-      total: Number(record.total || 0),
+      total: calculateRecordTotal(record),
       notas: record.notas || '—',
       stock: record.stock || '—'
     }))
@@ -1023,7 +1036,7 @@ function getAnalyticsExportRows() {
   const totalQr = filteredRecords.reduce((sum, record) => sum + record.qr, 0);
   const totalPedidosYa = filteredRecords.reduce((sum, record) => sum + record.pedidosYa, 0);
   const totalTiraxy = filteredRecords.reduce((sum, record) => sum + record.tiraxy, 0);
-  const totalGeneral = filteredRecords.reduce((sum, record) => sum + record.total, 0);
+  const totalGeneral = filteredRecords.reduce((sum, record) => sum + calculateRecordTotal(record), 0);
   const daysCount = Math.max(1, Math.round((end - start) / 86400000) + 1);
   const recordCount = filteredRecords.length;
 
@@ -1255,8 +1268,8 @@ async function renderAnalytics() {
   const monthRecords = source.filter((record) => record.fecha && record.fecha.startsWith(today.toISOString().slice(0, 7)));
   const selectedRecords = [...rangeRecords].sort((a, b) => String(b.id).localeCompare(String(a.id)));
 
-  const rangeTotalValue = rangeRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
-  const monthTotalValue = monthRecords.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const rangeTotalValue = rangeRecords.reduce((sum, record) => sum + calculateRecordTotal(record), 0);
+  const monthTotalValue = monthRecords.reduce((sum, record) => sum + calculateRecordTotal(record), 0);
   const daysInRange = Math.max(1, Math.round((end - start) / 86400000) + 1);
   const avgValue = rangeTotalValue / daysInRange;
 
@@ -1276,7 +1289,7 @@ async function renderAnalytics() {
 
   const values = days.map((date) => {
     const iso = formatDateInput(date);
-    return source.filter((record) => record.fecha === iso).reduce((sum, item) => sum + Number(item.total || 0), 0);
+    return source.filter((record) => record.fecha === iso).reduce((sum, item) => sum + calculateRecordTotal(item), 0);
   });
 
   const width = canvas.width;
@@ -1346,7 +1359,7 @@ async function renderAnalytics() {
       <td>${money(record.qr)}</td>
       <td>${money(record.pedidosYa || record.pedidos_ya || 0)}</td>
       <td>${money(record.tiraxy || 0)}</td>
-      <td>${money(record.total)}</td>
+      <td>${money(calculateRecordTotal(record))}</td>
       <td>${record.notas || '—'}</td>
       <td>${record.stock || '—'}</td>
       <td>${isAdmin ? `<button class="secondary-btn edit-record" data-id="${record.id}">Editar</button> <button class="secondary-btn delete-record" data-id="${record.id}">Eliminar</button>` : '—'}</td>
@@ -1864,7 +1877,7 @@ async function initDashboardPage() {
           tiraxy,
           notas,
           stock,
-          total: efectivo + transferencias + qr + pedidosYa + tiraxy
+          total: calculateRecordTotal({ efectivo, transferencias, qr, pedidosYa, tiraxy })
         });
         saveStoredRecords(allRecords);
       }

@@ -172,6 +172,61 @@ async function writeJsonFile(name, data) {
   }
 }
 
+function calculateRecordTotal(record = {}) {
+  return Number(record.efectivo || 0)
+    + Number(record.transferencias || 0)
+    + Number(record.pedidosYa ?? record.pedidos_ya ?? 0)
+    + Number(record.tiraxy || 0);
+}
+
+function normalizeJsonRecord(record = {}) {
+  return {
+    id: record.id ?? record.record_id ?? Date.now(),
+    fecha: record.fecha || '',
+    hora: record.hora || (record.created_at ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false }) : '00:00:00'),
+    usuario: record.usuario || 'Sin usuario',
+    sucursal: record.sucursal || 'Centro',
+    efectivo: Number(record.efectivo || 0),
+    transferencias: Number(record.transferencias || 0),
+    qr: Number(record.qr || 0),
+    pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
+    tiraxy: Number(record.tiraxy || 0),
+    notas: record.notas || '',
+    stock: record.stock || '',
+    total: calculateRecordTotal(record),
+    created_at: record.created_at || new Date().toISOString()
+  };
+}
+
+async function syncRecordsJsonFromDb() {
+  if (!pool) return readJsonFile('records.json');
+
+  const [rows] = await pool.execute(`
+    SELECT id, fecha, hora, usuario, sucursal, efectivo, transferencias, qr, pedidos_ya AS pedidosYa, tiraxy, notas, stock, total, created_at
+    FROM records
+    ORDER BY created_at DESC, id DESC
+  `);
+
+  const storedRecords = await readJsonFile('records.json');
+  const normalizedDb = (rows || []).map(normalizeJsonRecord);
+  const normalizedJson = (Array.isArray(storedRecords) ? storedRecords : []).map(normalizeJsonRecord);
+  const merged = [...normalizedJson, ...normalizedDb];
+  const deduped = new Map();
+
+  merged.forEach((record) => {
+    deduped.set(String(record.id), record);
+  });
+
+  const nextRecords = [...deduped.values()].sort((a, b) => {
+    const aValue = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bValue = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bValue - aValue || String(b.id).localeCompare(String(a.id));
+  });
+
+  await writeJsonFile('records.json', nextRecords);
+  return nextRecords;
+}
+
 
 /* =========================================================
    MULTER / UPLOADS
@@ -843,7 +898,6 @@ app.post(
     const total =
       cleanAmounts.efectivo +
       cleanAmounts.transferencias +
-      cleanAmounts.qr +
       cleanAmounts.pedidosYa +
       cleanAmounts.tiraxy;
 
@@ -984,9 +1038,7 @@ app.get(
   async (req, res) => {
 
     const records =
-      await readJsonFile(
-        'records.json'
-      );
+      await syncRecordsJsonFromDb();
 
     res.json(records);
 
@@ -1000,9 +1052,7 @@ app.get(
   async (req, res) => {
 
     const records =
-      await readJsonFile(
-        'records.json'
-      );
+      await syncRecordsJsonFromDb();
 
     res.json(records);
 
@@ -1043,7 +1093,6 @@ app.put(
         (
           Number(efectivo || 0) +
           Number(transferencias || 0) +
-          Number(qr || 0) +
           pedidosValue +
           tiraxyValue
         ).toFixed(2)
@@ -1098,7 +1147,6 @@ app.put(
       const total =
         Number(efectivo || 0) +
         Number(transferencias || 0) +
-        Number(qr || 0) +
         Number(pedidosYa || 0) +
         Number(tiraxy || 0);
 
