@@ -548,10 +548,19 @@ async function initDatabase() {
           }));
 
 
-        await writeJsonFile(
-          'employees.json',
-          empsToWrite
-        );
+        // Nunca se pisa un employees.json con datos por una lista vacía
+        // (p. ej. BD recién creada en un despliegue nuevo).
+        const existingEmps = await readJsonFile('employees.json');
+        if (
+          empsToWrite.length ||
+          !Array.isArray(existingEmps) ||
+          !existingEmps.length
+        ) {
+          await writeJsonFile(
+            'employees.json',
+            empsToWrite
+          );
+        }
 
       } catch (err) {
 
@@ -977,9 +986,22 @@ async function trySyncAfterWrite(options = {}) {
   }
 }
 
+// Si MySQL no responde tras los reintentos de initDatabase(), el servidor NO se cae:
+// sigue arriba, las rutas de registros responden 503 (ensureDb) y se vuelve a intentar.
 (async () => {
 
-  pool = await initDatabase();
+  for (;;) {
+    try {
+      pool = await initDatabase();
+      break;
+    } catch (error) {
+      console.error(
+        'No se pudo inicializar MySQL. Se reintenta en 30 s:',
+        error.message || error
+      );
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+    }
+  }
 
   try {
     const { stats } = await syncRecordsJsonFromDatabase({ backfillState: true });
