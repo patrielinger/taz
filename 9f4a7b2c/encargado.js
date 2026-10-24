@@ -235,7 +235,7 @@ async function initPage() {
     const notas = document.getElementById('encNotes').value.trim();
     const stock = document.getElementById('encStock').value.trim();
     const usuario = emp ? `${emp.name || ''} ${emp.lastName || ''}`.trim() || emp.phone : phone;
-    const total = efectivo + transferencias + pedidosYa + tiraxyVal;
+    const total = efectivo + transferencias + qrVal + pedidosYa + tiraxyVal;
     const sessionState = sessionStorage.getItem(SESSION_KEY);
     if (sessionState) {
       try {
