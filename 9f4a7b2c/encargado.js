@@ -247,10 +247,17 @@ async function initPage() {
         });
 
         if (!resp.ok) {
-          const text = await resp.text();
-          throw new Error(text || 'Error en servidor');
+          const raw = await resp.text();
+          let message = raw;
+          try { message = JSON.parse(raw).message || raw; } catch (parseError) { /* texto plano */ }
+          throw new Error(message || 'Error en servidor');
         }
-        showNotice('Registro enviado', 'El ingreso fue enviado correctamente.', 'success');
+        const created = await resp.json().catch(() => ({}));
+        if (created && created.duplicate) {
+          showNotice('Registro ya enviado', created.message || 'Este registro ya había sido enviado.', 'info');
+        } else {
+          showNotice('Registro enviado', 'El ingreso fue enviado correctamente.', 'success');
+        }
         form.reset();
         setDefault();
         updateTotal();

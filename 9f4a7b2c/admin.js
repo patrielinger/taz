@@ -54,9 +54,31 @@ function normalizeRecordState(value) {
 }
 
 function isCountableRecord(record = {}) {
+  // El backend calcula `countable` con la regla única (estado distinto de Z).
+  if (typeof record.countable === 'boolean') return record.countable;
   const state = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '');
   return state !== 'Z' && state !== 'Z (encQR)';
 }
+
+function escapeStateText(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function stateBadge(record = {}) {
+  const state = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '');
+  if (!state) return '';
+  if (!isCountableRecord(record)) {
+    return ' <span class="state-badge state-badge-z" title="Estado Z: se muestra pero no suma al total">Z</span>';
+  }
+  return ` <span class="state-badge" title="Estado: ${escapeStateText(state)}">${escapeStateText(state)}</span>`;
+}
+
+// Si el servidor guardó pero falló el JSON de respaldo, se lo informa junto al éxito.
+function withWarning(message, response) {
+  return response && response.warning ? `${message} ${response.warning}` : message;
+}
+
+let lastRecordUpdateResponse = null;
 
 function getCountableRecords(records) {
   return Array.isArray(records) ? records.filter(isCountableRecord) : [];
@@ -339,20 +361,50 @@ async function verifyRecordPersistedOnServer(id, payload) {
     const sameTiraxy = Number(record.tiraxy || 0) === Number(payload.tiraxy || 0);
     const sameNotas = String(record.notas || '') === String(payload.notas || '');
     const sameStock = String(record.stock || '') === String(payload.stock || '');
-    const sameState = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '') === normalizeRecordState(payload.estado ?? '');
+    // Si el payload no trae estado, el servidor conserva el actual: no se compara.
+    const sameState = payload.estado === undefined
+      || normalizeRecordState(record.estado ?? record.status ?? record.state ?? '') === normalizeRecordState(payload.estado);
 
     return sameDate && sameBranch && sameEfectivo && sameTransferencias && sameQr && samePedidosYa && sameTiraxy && sameNotas && sameStock && sameState;
   });
 }
 
 async function persistRecordUpdate(id, payload) {
-  const currentRecords = getStoredRecords();
-  const nextRecords = currentRecords.map((record) => {
+  lastRecordUpdateResponse = null;
+
+  // El servidor es la fuente de verdad: si falla, NO se toca la copia local
+  // (antes se guardaba igual y quedaba desfasada del servidor).
+  let response;
+  try {
+    response = await fetchJson(`/api/records/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        fecha: payload.fecha,
+        sucursal: payload.sucursal,
+        efectivo: payload.efectivo,
+        transferencias: payload.transferencias,
+        qr: payload.qr,
+        pedidosYa: payload.pedidosYa,
+        tiraxy: payload.tiraxy,
+        notas: payload.notas,
+        stock: payload.stock,
+        estado: payload.estado // undefined => el servidor conserva el estado actual
+      })
+    });
+
+    const persisted = await verifyRecordPersistedOnServer(id, payload);
+    if (!persisted) {
+      throw new Error('La actualización no quedó confirmada por el servidor.');
+    }
+  } catch (error) {
+    throw new Error(error.message || 'No se pudo enviar o cargar los datos');
+  }
+
+  const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
+  const nextRecords = getStoredRecords().map((record) => {
     if (String(record.id) !== String(id)) return record;
 
-    const total = Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0);
-
-    return {
+    const next = {
       ...record,
       fecha: payload.fecha || record.fecha,
       sucursal: payload.sucursal || record.sucursal,
@@ -365,36 +417,14 @@ async function persistRecordUpdate(id, payload) {
       stock: payload.stock || '',
       total
     };
+    if (payload.estado !== undefined) next.estado = payload.estado;
+    delete next.countable;
+    return next;
   });
+  saveStoredRecords(nextRecords);
 
-  try {
-    const response = await fetchJson(`/api/records/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        fecha: payload.fecha,
-        sucursal: payload.sucursal,
-        efectivo: payload.efectivo,
-        transferencias: payload.transferencias,
-        qr: payload.qr,
-        pedidosYa: payload.pedidosYa,
-        tiraxy: payload.tiraxy,
-        notas: payload.notas,
-        stock: payload.stock,
-        estado: payload.estado || ''
-      })
-    });
-
-    const persisted = await verifyRecordPersistedOnServer(id, payload);
-    if (!persisted) {
-      throw new Error('La actualización no quedó confirmada por el servidor.');
-    }
-
-    saveStoredRecords(nextRecords);
-    return response;
-  } catch (error) {
-    saveStoredRecords(nextRecords);
-    throw new Error(error.message || 'No se pudo enviar o cargar los datos');
-  }
+  lastRecordUpdateResponse = response;
+  return response;
 }
 
 function renderRecords(records) {
@@ -418,7 +448,7 @@ function renderRecords(records) {
 
   table.innerHTML = filteredRecords.map((record) => `
     <tr data-id="${record.id}">
-      <td>${record.sucursal}</td>
+      <td>${record.sucursal}${stateBadge(record)}</td>
       <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora}</td>
       <td>${record.usuario}</td>
@@ -450,7 +480,8 @@ function renderRecords(records) {
           pedidosYa: payload.pedidosYa,
           tiraxy: payload.tiraxy,
           notas: payload.notas,
-          stock: payload.stock
+          stock: payload.stock,
+          estado: payload.estado
         });
         await renderDashboard();
       });
@@ -469,9 +500,9 @@ function renderRecords(records) {
         showCancel: true,
         onConfirm: async () => {
           try {
-            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            const deleteResponse = await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
             await renderDashboard();
-            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+            showNotice('Registro eliminado', withWarning('El ingreso fue eliminado correctamente.', deleteResponse), 'success');
           } catch (err) {
             showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
           }
@@ -673,6 +704,24 @@ function openRecordEditor(record, onSave) {
           <textarea id="editRecordStock" rows="4">${(record.stock || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
         </div>
       </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label for="editRecordState">Estado</label>
+          <select id="editRecordState">
+            ${(() => {
+              const current = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '');
+              const options = [
+                { value: '', label: 'Normal (suma al total)' },
+                { value: 'Z (encQR)', label: 'Z (se muestra, no suma al total)' }
+              ];
+              if (current && !options.some((option) => option.value === current)) {
+                options.push({ value: current, label: current });
+              }
+              return options.map((option) => `<option value="${escapeStateText(option.value)}" ${option.value === current ? 'selected' : ''}>${escapeStateText(option.label)}</option>`).join('');
+            })()}
+          </select>
+        </div>
+      </div>
     </form>
   `;
 
@@ -715,10 +764,17 @@ function openRecordEditor(record, onSave) {
           tiraxy: Number(sanitizeNumber(document.getElementById('editRecordTiraxy')?.value || 0)),
           notas: document.getElementById('editRecordNotes').value.trim(),
           stock: document.getElementById('editRecordStock').value.trim(),
+          estado: document.getElementById('editRecordState')?.value
         };
 
+        lastRecordUpdateResponse = null;
         await onSave(payload);
-        showNotice('Registro actualizado', 'El ingreso fue actualizado correctamente.', 'success');
+        const updateResponse = lastRecordUpdateResponse;
+        if (updateResponse && updateResponse.changed === false) {
+          showNotice('Sin cambios', 'El registro ya tenía esos datos; no se modificó nada.', 'info');
+        } else {
+          showNotice('Registro actualizado', withWarning('El ingreso fue actualizado correctamente.', updateResponse), 'success');
+        }
       } catch (error) {
         showNotice('No se pudo actualizar', error?.message || 'No se pudo actualizar el registro.', 'error');
       }
@@ -743,7 +799,7 @@ async function renderRecordsByDate(date) {
   table.innerHTML = filtered.map((record) => `
     <tr data-id="${record.id}">
       <td>${record.hora || ''}</td>
-      <td>${record.sucursal}</td>
+      <td>${record.sucursal}${stateBadge(record)}</td>
       <td>${record.usuario}</td>
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
@@ -773,7 +829,8 @@ async function renderRecordsByDate(date) {
           pedidosYa: payload.pedidosYa,
           tiraxy: payload.tiraxy,
           notas: payload.notas,
-          stock: payload.stock
+          stock: payload.stock,
+          estado: payload.estado
         });
         await renderRecordsByDate(date);
         await renderDashboard();
@@ -793,10 +850,10 @@ async function renderRecordsByDate(date) {
         showCancel: true,
         onConfirm: async () => {
           try {
-            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            const deleteResponse = await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
             await renderRecordsByDate(date);
             await renderDashboard();
-            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+            showNotice('Registro eliminado', withWarning('El ingreso fue eliminado correctamente.', deleteResponse), 'success');
           } catch (err) {
             showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
           }
@@ -985,8 +1042,10 @@ async function loadRecords() {
         qr: Number(record.qr || 0),
         pedidosYa: Number(record.pedidosYa ?? record.pedidos_ya ?? 0),
         notas: record.notas || '',
+        tiraxy: Number(record.tiraxy || 0),
         stock: record.stock || '',
         estado: record.estado || record.status || '',
+        countable: typeof record.countable === 'boolean' ? record.countable : undefined,
         total: Number(record.total || 0),
         created_at: record.created_at || null
       }));
@@ -1421,7 +1480,7 @@ async function renderAnalytics() {
     <tr data-id="${record.id}">
       <td>${formatDisplayDate(record.fecha)}</td>
       <td>${record.hora || '—'}</td>
-      <td>${normalizeBranchName(record.sucursal)}</td>
+      <td>${normalizeBranchName(record.sucursal)}${stateBadge(record)}</td>
       <td>${record.usuario}</td>
       <td>${money(record.efectivo)}</td>
       <td>${money(record.transferencias)}</td>
@@ -1452,6 +1511,7 @@ async function renderAnalytics() {
           tiraxy: payload.tiraxy,
           notas: payload.notas,
           stock: payload.stock,
+          estado: payload.estado
         });
         await renderAnalytics();
         await renderDashboard();
@@ -1471,10 +1531,10 @@ async function renderAnalytics() {
         showCancel: true,
         onConfirm: async () => {
           try {
-            await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
+            const deleteResponse = await fetchJson(`/api/records/${id}`, { method: 'DELETE' });
             await renderAnalytics();
             await renderDashboard();
-            showNotice('Registro eliminado', 'El ingreso fue eliminado correctamente.', 'success');
+            showNotice('Registro eliminado', withWarning('El ingreso fue eliminado correctamente.', deleteResponse), 'success');
           } catch (err) {
             showNotice('No se pudo eliminar', err.message || 'No se pudo eliminar el registro.', 'error');
           }
@@ -1953,10 +2013,11 @@ async function initDashboardPage() {
     const stock = (document.getElementById('stockInput')?.value || '').trim();
     const notas = document.getElementById('notesInput').value.trim();
 
+    let createResponse = null;
     try {
       const sessionState = sessionStorage.getItem(SESSION_KEY);
       if (sessionState) {
-        await fetchJson('/api/records', {
+        createResponse = await fetchJson('/api/records', {
           method: 'POST',
           credentials: 'include',
           body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, tiraxy, notas, stock })
@@ -1984,7 +2045,11 @@ async function initDashboardPage() {
       form.reset();
       setDefaultDate();
       await renderDashboard();
-      showNotice('Ingreso cargado', 'El ingreso fue cargado correctamente.', 'success');
+      if (createResponse && createResponse.duplicate) {
+        showNotice('Ingreso ya cargado', createResponse.message, 'info');
+      } else {
+        showNotice('Ingreso cargado', withWarning('El ingreso fue cargado correctamente.', createResponse), 'success');
+      }
     } catch (error) {
       showNotice('No se pudo guardar', error.message || 'No se pudo guardar el ingreso.', 'error');
     }

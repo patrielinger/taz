@@ -838,3 +838,23 @@ canvas {
     padding-bottom: 16px;
   }
 }
+
+
+/* Estado del registro (Z = se muestra pero no suma al total) */
+.state-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.state-badge-z {
+  border-color: rgba(242, 13, 22, 0.7);
+  color: #ff8a8f;
+}
