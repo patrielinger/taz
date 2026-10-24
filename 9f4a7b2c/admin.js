@@ -623,7 +623,82 @@ function showNotice(title, message, type = 'info') {
   }
 }
 
+function serializeIncomeFormPayload() {
+  const form = document.getElementById('incomeForm');
+  if (!form) {
+    return null;
+  }
+
+  return {
+    fecha: document.getElementById('incomeDate')?.value || new Date().toISOString().slice(0, 10),
+    sucursal: document.getElementById('branchSelect')?.value || 'Centro',
+    efectivo: Number(sanitizeNumber(document.getElementById('cashInput')?.value || 0)),
+    transferencias: Number(sanitizeNumber(document.getElementById('transferInput')?.value || 0)),
+    qr: Number(sanitizeNumber(document.getElementById('qrInput')?.value || 0)),
+    pedidosYa: Number(sanitizeNumber(document.getElementById('pedidosYaInput')?.value || 0)),
+    tiraxy: Number(sanitizeNumber(document.getElementById('tiraxyInput')?.value || 0)),
+    notas: document.getElementById('notesInput')?.value.trim() || '',
+    stock: document.getElementById('stockInput')?.value.trim() || '',
+    estado: document.getElementById('recordState')?.value ?? ''
+  };
+}
+
+function populateIncomeFormFromRecord(record = {}) {
+  const form = document.getElementById('incomeForm');
+  if (!form) return false;
+
+  const fecha = normalizeRecordDate(record.fecha) || new Date().toISOString().slice(0, 10);
+  const sucursal = record.sucursal || 'Centro';
+  const branchSelect = document.getElementById('branchSelect');
+  const cashInput = document.getElementById('cashInput');
+  const transferInput = document.getElementById('transferInput');
+  const qrInput = document.getElementById('qrInput');
+  const pedidosYaInput = document.getElementById('pedidosYaInput');
+  const tiraxyInput = document.getElementById('tiraxyInput');
+  const notesInput = document.getElementById('notesInput');
+  const stockInput = document.getElementById('stockInput');
+  const incomeDate = document.getElementById('incomeDate');
+
+  if (incomeDate) incomeDate.value = fecha;
+  if (branchSelect) branchSelect.value = sucursal;
+  if (cashInput) cashInput.value = Number(record.efectivo || 0);
+  if (transferInput) transferInput.value = Number(record.transferencias || 0);
+  if (qrInput) qrInput.value = Number(record.qr || 0);
+  if (pedidosYaInput) pedidosYaInput.value = Number(record.pedidosYa ?? record.pedidos_ya ?? 0);
+  if (tiraxyInput) tiraxyInput.value = Number(record.tiraxy || 0);
+  if (notesInput) notesInput.value = record.notas || '';
+  if (stockInput) stockInput.value = record.stock || '';
+
+  const tiraxyInputGroup = document.getElementById('tiraxyInputGroup');
+  if (tiraxyInputGroup) {
+    const showTiraxy = ['Alvear', 'Centro'].includes(normalizeBranchName(String(sucursal)));
+    tiraxyInputGroup.style.display = showTiraxy ? 'block' : 'none';
+  }
+
+  form.dataset.editingId = String(record.id ?? '');
+  const submitButton = form.querySelector('.submit-btn');
+  if (submitButton) submitButton.textContent = 'Guardar cambios';
+
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
+function resetIncomeFormMode() {
+  const form = document.getElementById('incomeForm');
+  if (!form) return;
+
+  delete form.dataset.editingId;
+  const submitButton = form.querySelector('.submit-btn');
+  if (submitButton) submitButton.textContent = 'Subir';
+}
+
 function openRecordEditor(record, onSave) {
+  const incomeForm = document.getElementById('incomeForm');
+  if (incomeForm) {
+    populateIncomeFormFromRecord(record);
+    return;
+  }
+
   const modal = setupModal();
   if (!modal) return;
 
@@ -924,12 +999,27 @@ function drawChart(records) {
   if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
-  const startDate = document.getElementById('chartStart');
-  const endDate = document.getElementById('chartEnd');
+  if (!ctx) return;
 
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 30;
+
+  const startDateInput = document.getElementById('chartStart');
+  const endDateInput = document.getElementById('chartEnd');
   const sourceRecords = Array.isArray(records) ? records : getStoredRecords();
-  const start = startDate && startDate.value ? new Date(startDate.value + 'T00:00:00') : new Date();
-  const end = endDate && endDate.value ? new Date(endDate.value + 'T00:00:00') : new Date();
+
+  const start = startDateInput && startDateInput.value ? new Date(`${startDateInput.value}T00:00:00`) : new Date();
+  const end = endDateInput && endDateInput.value ? new Date(`${endDateInput.value}T00:00:00`) : new Date();
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#b5b5b5';
+    ctx.font = '18px "Barlow Condensed", sans-serif';
+    ctx.fillText('Rango de fechas no válido', padding, height / 2);
+    setupChartHover(canvas, []);
+    return;
+  }
 
   const dates = [];
   const current = new Date(start);
@@ -939,17 +1029,25 @@ function drawChart(records) {
   }
 
   const amounts = dates.map((date) => {
-      const iso = date.toISOString().slice(0, 10);
-      return getCountableRecords(sourceRecords.filter((record) => record.fecha === iso))
-        .reduce((sum, record) => sum + Number(record.total || 0), 0);
-    });
+    const iso = formatDateInput(date);
+    return getCountableRecords(sourceRecords.filter((record) => record.fecha === iso))
+      .reduce((sum, record) => sum + Number(record.total || 0), 0);
+  });
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#0b0b0b';
+  ctx.fillRect(0, 0, width, height);
+
+  const maxValue = Math.max(...amounts, 1);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath();
   for (let i = 0; i <= 4; i += 1) {
     const y = padding + ((height - padding * 2) / 4) * i;
-    ctx.beginPath();
     ctx.moveTo(padding, y);
     ctx.lineTo(width - padding, y);
-    ctx.stroke();
   }
+  ctx.stroke();
 
   ctx.beginPath();
   ctx.moveTo(padding, padding);
@@ -958,9 +1056,9 @@ function drawChart(records) {
   ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.stroke();
 
-  if (!amounts.length) {
+  if (!amounts.length || amounts.every((value) => value === 0)) {
     ctx.fillStyle = '#b5b5b5';
-    ctx.font = '18px Barlow Condensed';
+    ctx.font = '18px "Barlow Condensed", sans-serif';
     ctx.fillText('Sin datos para el rango seleccionado', padding, height / 2);
     setupChartHover(canvas, []);
     return;
@@ -976,7 +1074,7 @@ function drawChart(records) {
   amounts.forEach((value, index) => {
     const x = padding + index * stepX;
     const y = height - padding - (value / maxValue) * (height - padding * 2);
-    points.push({ x, y, date: dates[index].toISOString().slice(0, 10), total: value });
+    points.push({ x, y, date: formatDateInput(dates[index]), total: value });
     if (index === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
@@ -1972,55 +2070,88 @@ async function initDashboardPage() {
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const branch = document.getElementById('branchSelect').value;
-    const fecha = document.getElementById('incomeDate').value || new Date().toISOString().slice(0, 10);
-    const efectivo = Number(sanitizeNumber(document.getElementById('cashInput').value));
-    const transferencias = Number(sanitizeNumber(document.getElementById('transferInput').value));
-    const qr = Number(sanitizeNumber(document.getElementById('qrInput').value));
-    const pedidosYa = Number(sanitizeNumber(document.getElementById('pedidosYaInput')?.value || 0));
-    const tiraxy = Number(sanitizeNumber(document.getElementById('tiraxyInput')?.value || 0));
-    const stock = (document.getElementById('stockInput')?.value || '').trim();
-    const notas = document.getElementById('notesInput').value.trim();
+    const submitButton = form.querySelector('.submit-btn');
+    const isEditing = Boolean(form.dataset.editingId);
+    const originalText = submitButton?.textContent || 'Guardar';
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = isEditing ? 'Guardando...' : 'Guardando...';
+    }
 
-    let createResponse = null;
     try {
+      const payload = serializeIncomeFormPayload();
+      if (!payload || !payload.fecha || !payload.sucursal) {
+        showNotice('Faltan datos', 'Completá la fecha y la sucursal antes de guardar.', 'error');
+        return;
+      }
+
       const sessionState = sessionStorage.getItem(SESSION_KEY);
+      let response = null;
+
       if (sessionState) {
-        createResponse = await fetchJson('/api/records', {
-          method: 'POST',
-          credentials: 'include',
-          body: JSON.stringify({ fecha, sucursal: branch, efectivo, transferencias, qr, pedidosYa, tiraxy, notas, stock })
-        });
+        if (isEditing && form.dataset.editingId) {
+          response = await fetchJson(`/api/records/${form.dataset.editingId}`, {
+            method: 'PUT',
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+
+          const persisted = await verifyRecordPersistedOnServer(form.dataset.editingId, payload);
+          if (!persisted) {
+            throw new Error('La actualización no quedó confirmada por el servidor.');
+          }
+        } else {
+          response = await fetchJson('/api/records', {
+            method: 'POST',
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+        }
       } else {
         const allRecords = getStoredRecords();
-        allRecords.push({
-          id: `${Date.now()}-${branch}`,
-          fecha,
-          hora: new Date().toLocaleTimeString('es-AR', { hour12: false }),
-          usuario: 'admin',
-          sucursal: branch,
-          efectivo,
-          transferencias,
-          qr,
-          pedidosYa,
-          tiraxy,
-          notas,
-          stock,
-          total: efectivo + transferencias + qr + pedidosYa + tiraxy
-        });
-        saveStoredRecords(allRecords);
+        if (isEditing && form.dataset.editingId) {
+          const nextRecords = allRecords.map((record) => {
+            if (String(record.id) !== String(form.dataset.editingId)) return record;
+            return {
+              ...record,
+              ...payload,
+              total: Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0)
+            };
+          });
+          saveStoredRecords(nextRecords);
+        } else {
+          allRecords.push({
+            id: `${Date.now()}-${payload.sucursal}`,
+            ...payload,
+            hora: new Date().toLocaleTimeString('es-AR', { hour12: false }),
+            usuario: 'admin',
+            total: Number(payload.efectivo || 0) + Number(payload.transferencias || 0) + Number(payload.qr || 0) + Number(payload.pedidosYa || 0) + Number(payload.tiraxy || 0)
+          });
+          saveStoredRecords(allRecords);
+        }
+        response = { ok: true, message: isEditing ? 'Registro actualizado correctamente.' : 'Ingreso cargado correctamente.' };
       }
 
       form.reset();
+      if (submitButton) submitButton.textContent = originalText;
+      resetIncomeFormMode();
       setDefaultDate();
       await renderDashboard();
-      if (createResponse && createResponse.duplicate) {
-        showNotice('Ingreso ya cargado', createResponse.message, 'info');
+
+      if (response && response.duplicate) {
+        showNotice('Ingreso ya cargado', response.message, 'info');
+      } else if (isEditing) {
+        showNotice('Ingreso actualizado', withWarning('El ingreso fue actualizado correctamente.', response), 'success');
       } else {
-        showNotice('Ingreso cargado', withWarning('El ingreso fue cargado correctamente.', createResponse), 'success');
+        showNotice('Ingreso cargado', withWarning('El ingreso fue cargado correctamente.', response), 'success');
       }
     } catch (error) {
       showNotice('No se pudo guardar', error.message || 'No se pudo guardar el ingreso.', 'error');
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = form.dataset.editingId ? 'Guardar cambios' : 'Subir';
+      }
     }
   });
 
