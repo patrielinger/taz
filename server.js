@@ -471,6 +471,36 @@ async function initDatabase() {
       }
 
 
+      // Columna `hora` (aditiva): permite editar la hora de un registro.
+      // Los registros existentes quedan en NULL y siguen derivando la hora de created_at.
+      try {
+
+        const [horaRows] = await pool.execute(
+          `SELECT COUNT(*) AS cnt
+           FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = ?
+           AND TABLE_NAME = 'records'
+           AND COLUMN_NAME = 'hora'`,
+          [dbConfig.database]
+        );
+
+        if (!horaRows || !horaRows[0] || Number(horaRows[0].cnt) === 0) {
+          await pool.execute(`ALTER TABLE records ADD COLUMN hora VARCHAR(8) NULL`);
+        }
+
+        recordsHasHora = true;
+
+      } catch (err) {
+
+        recordsHasHora = false;
+        console.error(
+          'No se pudo asegurar la columna records.hora. ' +
+          'La hora no se podrá editar:',
+          err.message || err
+        );
+      }
+
+
       const [adminRows] =
         await pool.execute(
           'SELECT * FROM admins WHERE username = ?',
@@ -611,6 +641,8 @@ const DUPLICATE_WINDOW_SECONDS = 60;
 
 // Se vuelve true cuando initDatabase() confirma que existe records.estado.
 let recordsHasEstado = false;
+// Se vuelve true cuando initDatabase() confirma que existe records.hora.
+let recordsHasHora = false;
 
 class RecordsError extends Error {
   constructor(code, message, status = 500, cause = null) {
@@ -655,6 +687,29 @@ function normalizeRecordState(value) {
   return raw;
 }
 
+// Hora de un registro. Sin APP_TIMEZONE se usa la zona del servidor (comportamiento histórico).
+const RECORD_TIME_OPTIONS = {
+  hourCycle: 'h23',
+  ...(process.env.APP_TIMEZONE ? { timeZone: process.env.APP_TIMEZONE } : {})
+};
+
+function formatRecordTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '00:00:00'
+    : date.toLocaleTimeString('es-AR', RECORD_TIME_OPTIONS);
+}
+
+function nowRecordTime() {
+  return formatRecordTime(Date.now());
+}
+
+// Acepta HH:MM o HH:MM:SS y devuelve HH:MM:SS ('' si no es válida).
+function normalizeRecordTime(value) {
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(String(value ?? '').trim());
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}:${m[3] || '00'}` : '';
+}
+
 function getRecordTotal(record = {}) {
   return Number(
     record.total ?? (
@@ -693,11 +748,7 @@ function normalizeRecordRow(record = {}) {
   return {
     id: record.id ?? record.record_id ?? record.recordId,
     fecha: normalizeRecordDate(record.fecha_iso || record.fecha || ''),
-    hora: record.hora || (
-      record.created_at
-        ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false })
-        : '00:00:00'
-    ),
+    hora: record.hora || (record.created_at ? formatRecordTime(record.created_at) : '00:00:00'),
     usuario: record.usuario || record.user || 'Sin usuario',
     sucursal: record.sucursal || 'Centro',
     efectivo: Number(record.efectivo || 0),
@@ -771,6 +822,15 @@ function validateRecordPayload(body = {}, { allowEstado = true } = {}) {
       throw new RecordsError('INVALID_DATA', 'El estado es demasiado largo.', 400);
     }
     clean.estado = estado;
+  }
+
+  // `hora` solo se incluye si vino en el body (undefined = "no tocar").
+  if (body.hora !== undefined && body.hora !== null && String(body.hora).trim() !== '') {
+    const hora = normalizeRecordTime(body.hora);
+    if (!hora) {
+      throw new RecordsError('INVALID_DATA', 'La hora no es válida.', 400);
+    }
+    clean.hora = hora;
   }
 
   return clean;
@@ -1368,6 +1428,11 @@ app.post(
           values.push(clean.estado);
         }
 
+        if (recordsHasHora) {
+          columns.push('hora');
+          values.push(clean.hora || nowRecordTime());
+        }
+
         const [result] = await pool.execute(
           `INSERT INTO records (${columns.join(', ')})
            VALUES (${columns.map(() => '?').join(', ')})`,
@@ -1518,6 +1583,14 @@ app.put(
       });
     }
 
+    if (clean.hora !== undefined && !recordsHasHora) {
+      return res.status(500).json({
+        ok: false,
+        code: 'DB_UPDATE',
+        message: 'La base de datos no tiene la columna de hora; no se puede guardar la hora.'
+      });
+    }
+
     let current;
     try {
       current = await fetchRecordRow(id);
@@ -1552,6 +1625,7 @@ app.put(
       currentNorm.tiraxy === clean.tiraxy &&
       currentNorm.notas === clean.notas &&
       currentNorm.stock === clean.stock &&
+      (clean.hora === undefined || currentNorm.hora === clean.hora) &&
       currentNorm.estado === nextEstado;
 
     if (!unchanged) {
@@ -1568,6 +1642,11 @@ app.put(
         if (recordsHasEstado) {
           sets.push('estado = ?');
           values.push(nextEstado);
+        }
+
+        if (recordsHasHora && clean.hora !== undefined) {
+          sets.push('hora = ?');
+          values.push(clean.hora);
         }
 
         values.push(id);

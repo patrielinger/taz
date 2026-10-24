@@ -2,430 +2,170 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TAZ Admin · Empleados</title>
-<link rel="shortcut icon" href="../img/logo-red.svg" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>TAZ Admin</title>
+  <link rel="shortcut icon" href="../img/logo-red.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./admin.css">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./panel.css">
 </head>
-<body class="admin-dashboard-page">
-  <aside class="sidebar">
-    <div class="brand-block">
-      <span class="eyebrow">TAZ</span>
-      <h2>ADMIN</h2>
-    </div>
+<body>
+  <nav class="rail" aria-label="Secciones">
+    <div class="logo">TAZ</div>
+    <button class="on" data-view="inicio">Inicio</button>
+    <button data-view="stats">Estadísticas</button>
+    <button data-view="team">Empleados</button>
+    <button class="out" id="logout">Salir</button>
+  </nav>
 
-    <nav class="sidebar-nav">
-      <button class="nav-link active" data-section="dashboard">Inicio</button>
-      <button class="nav-link" data-section="statistics">Estadísticas</button>
-      <button class="nav-link" data-section="employees">Empleados</button>
-    </nav>
-  </aside>
+  <main>
+    <!-- INICIO -->
+    <section id="inicio" class="view on">
+      <div class="bar">
+        <h1>Ingresos</h1>
+        <button class="btn red" id="newRec">Nuevo registro</button>
+      </div>
 
-  <div class="dashboard-content">
-    <header class="admin-header">
-      <div class="admin-header-inner">
+      <div class="kpis" id="kpis"></div>
+
+      <section class="block">
+        <div class="head">
+          <h2>Totales por local</h2>
+          <div class="tools"><label>Día<input type="date" id="dayPick"></label></div>
+        </div>
+        <div class="scroll" id="branchTbl"></div>
+      </section>
+
+      <section class="block">
+        <div class="head">
+          <h2>Evolución de ingresos</h2>
+          <div class="tools">
+            <label>Desde<input type="date" id="trFrom"></label>
+            <label>Hasta<input type="date" id="trTo"></label>
+          </div>
+        </div>
+        <div class="plot"><canvas id="trendChart"></canvas></div>
+      </section>
+
+      <section class="block">
+        <div class="head">
+          <h2>Historial de registros</h2>
+          <div class="tools">
+            <label>Desde<input type="date" id="recFrom"></label>
+            <label>Hasta<input type="date" id="recTo"></label>
+            <label>Sucursal<select id="recBranch"></select></label>
+          </div>
+        </div>
+        <div class="scroll" id="recTbl"></div>
+        <p class="foot" id="recSum"></p>
+      </section>
+    </section>
+
+    <!-- ESTADÍSTICAS -->
+    <section id="stats" class="view">
+      <div class="bar"><h1>Estadísticas</h1></div>
+      <div class="chips" id="scopeChips"></div>
+
+      <div class="head" style="margin-top:18px">
+        <div class="chips" id="rangeChips">
+          <button data-days="7">7 días</button>
+          <button data-days="14">14 días</button>
+          <button class="on" data-days="30">30 días</button>
+          <button data-days="90">90 días</button>
+        </div>
+        <div class="tools">
+          <label>Desde<input type="date" id="stFrom"></label>
+          <label>Hasta<input type="date" id="stTo"></label>
+        </div>
+      </div>
+
+      <div class="kpis" id="stKpis"></div>
+
+      <section class="block">
+        <div class="head"><h2 id="stTitle">Ingresos por día</h2></div>
+        <div class="plot"><canvas id="statsChart"></canvas></div>
+      </section>
+
+      <section class="block split">
         <div>
-          <span class="eyebrow">TAZ · PANEL</span>
-          <h1>INGRESOS</h1>
+          <div class="head"><h2>Por medio de pago</h2></div>
+          <ul class="bars" id="mixList"></ul>
         </div>
-        <button id="logoutBtn" type="button" class="secondary-btn">Cerrar sesión</button>
+        <div>
+          <div class="head"><h2>Por semana</h2></div>
+          <div class="scroll" id="weekTbl"></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="head"><h2>Registros del período</h2></div>
+        <div class="scroll" id="stTbl"></div>
+        <p class="foot" id="stSum"></p>
+      </section>
+    </section>
+
+    <!-- EMPLEADOS -->
+    <section id="team" class="view">
+      <div class="bar"><h1>Empleados</h1></div>
+      <div class="team">
+        <form id="empForm" class="form">
+          <h2 id="empTitle">Agregar empleado</h2>
+          <input type="hidden" id="eId">
+          <div class="two">
+            <label>Nombre<input id="eName" required></label>
+            <label>Apellido<input id="eLast" required></label>
+          </div>
+          <div class="two">
+            <label>Rol
+              <select id="eRole"><option>Empleado</option><option>Encargado</option></select>
+            </label>
+            <label>Cobro por hora<input id="eRate" type="number" min="0" step="0.01" value="0"></label>
+          </div>
+          <div class="two">
+            <label>Teléfono<input id="ePhone" type="tel" required></label>
+            <label>Sucursal<select id="eBranch"></select></label>
+          </div>
+          <label id="ePassWrap" hidden><span id="ePassLabel">Contraseña del encargado</span><input id="ePass" type="password" autocomplete="new-password"></label>
+          <label>Notas<textarea id="eNotes" rows="3"></textarea></label>
+          <div class="acts">
+            <button class="btn red" type="submit">Guardar empleado</button>
+            <button class="btn" type="button" id="eCancel">Cancelar</button>
+          </div>
+        </form>
+        <div id="empList"></div>
       </div>
+    </section>
+  </main>
+
+  <!-- Hoja para crear y editar registros -->
+  <aside class="sheet" id="sheet" aria-labelledby="sheetTitle" aria-hidden="true">
+    <header>
+      <div><h2 id="sheetTitle">Editar registro</h2><p id="sheetWho"></p></div>
+      <button class="btn sm" type="button" id="sheetClose" aria-label="Cerrar">Cerrar</button>
     </header>
-
-    <main class="admin-shell dashboard-shell">
-      <section id="dashboard" class="admin-section active-section">
-        <section class="panel intake-panel">
-          <div class="panel-head">
-            <div>
-              <span class="eyebrow">Carga diaria</span>
-              <h2>Registrar ingresos</h2>
-            </div>
-          </div>
-
-          <form id="incomeForm" class="admin-form">
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label for="incomeDate">Fecha</label>
-                <input type="date" id="incomeDate" required>
-              </div>
-
-              <div class="field-group">
-                <label for="branchSelect">Sucursal</label>
-                <select id="branchSelect" required>
-                  <option value="Alvear">Alvear</option>
-                  <option value="Centro">Centro</option>
-                  <option value="Ciudad de Nieva">Ciudad de Nieva</option>
-                  <option value="Alto Comedero">Alto Comedero</option>
-                  <option value="Hattogu">Hattogu</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="field-row payment-grid">
-              <div class="field-group">
-                <label for="cashInput">Efectivo</label>
-                <input type="text" id="cashInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
-              </div>
-
-              <div class="field-group">
-                <label for="transferInput">Transferencias / Tarjeta</label>
-                <input type="text" id="transferInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
-              </div>
-
-              <div class="field-group">
-                <label for="qrInput">Z</label>
-                <input type="text" id="qrInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
-              </div>
-
-              <div class="field-group">
-                <label for="pedidosYaInput">PedidosYa</label>
-                <input type="text" id="pedidosYaInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
-              </div>
-
-              <div class="field-group" id="tiraxyInputGroup" style="display:none;">
-                <label for="tiraxyInput">Tiraxy</label>
-                <input type="text" id="tiraxyInput" inputmode="numeric" pattern="[0-9]*" placeholder="$0" value="0">
-              </div>
-            </div>
-
-            <div class="field-row notes-stock-grid">
-              <div class="field-group">
-                <label for="notesInput">Notas del día</label>
-                <textarea id="notesInput" rows="4" placeholder="Ej: Cierre tarde, promociones, ajustes..."></textarea>
-              </div>
-
-              <div class="field-group">
-                <label for="stockInput">Stock / faltantes</label>
-                <textarea id="stockInput" rows="4" placeholder="Ej: Nuggets, Gaseosa 1L"></textarea>
-              </div>
-            </div>
-
-            <button type="submit" class="primary-btn submit-btn">Subir</button>
-          </form>
-        </section>
-
-        <section class="stats-grid">
-          <article class="stat-card panel">
-            <span>Total del día</span>
-            <strong id="dayTotal">$0</strong>
-          </article>
-          <article class="stat-card panel">
-            <span>Ingresos del mes</span>
-            <strong id="monthTotal">$0</strong>
-          </article>
-          <article class="stat-card panel">
-            <span>Promedio por sucursal</span>
-            <strong id="branchAverage">$0</strong>
-          </article>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head between">
-            <div>
-              <span class="eyebrow">Resumen por sucursal</span>
-              <h2>Totales por local</h2>
-            </div>
-            <div class="mini-filter">
-              <label for="dayFilter">Filtrar día</label>
-              <input type="date" id="dayFilter">
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sucursal</th>
-                  <th>Efectivo</th>
-                  <th>Transferencias / Tarjeta</th>
-                  <th>Z</th>
-                  <th>PedidosYa</th>
-                  <th>Tiraxy</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody id="branchSummaryTable"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="panel chart-panel">
-          <div class="panel-head between">
-            <div>
-              <span class="eyebrow">Estadísticas</span>
-              <h2>Ingresos por rango</h2>
-            </div>
-            <div class="range-controls">
-              <label>
-                <span>Desde</span>
-                <input type="date" id="chartStart">
-              </label>
-              <label>
-                <span>Hasta</span>
-                <input type="date" id="chartEnd">
-              </label>
-            </div>
-          </div>
-
-          <canvas id="incomeChart" width="900" height="280"></canvas>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head between">
-            <div>
-              <span class="eyebrow">Registros</span>
-              <h2>Buscar por fecha</h2>
-            </div>
-            <div class="mini-filter">
-              <label for="recordsDate">Seleccionar fecha</label>
-              <input type="date" id="recordsDate">
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Hora</th>
-                  <th>Sucursal</th>
-                  <th>Usuario</th>
-                  <th>Efectivo</th>
-                  <th>Transferencias / Tarjeta</th>
-                  <th>Z</th>
-                  <th>PedidosYa</th>
-                  <th>Tiraxy</th>
-                  <th>Total</th>
-                  <th>Notas</th>
-                  <th>Stock</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="recordsByDateTable"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <span class="eyebrow">Registros</span>
-              <h2>Historial por día</h2>
-            </div>
-          </div>
-
-          <div id="lastRecordPanel" class="panel" style="margin:12px; padding:12px; display:none;">
-            <strong>Último registro (últimas 24h):</strong>
-            <div id="lastRecordContent" style="margin-top:8px">—</div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sucursal</th>
-                  <th>Fecha</th>
-                  <th>Hora</th>
-                  <th>Usuario</th>
-                  <th>Efectivo</th>
-                  <th>Transferencias / Tarjeta</th>
-                  <th>Z</th>
-                  <th>PedidosYa</th>
-                  <th>Tiraxy</th>
-                  <th>Total</th>
-                  <th>Notas</th>
-                  <th>Stock</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="dailyRecordsTable"></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
-
-      <section id="statistics" class="admin-section">
-        <div class="panel analytics-panel">
-          <div class="panel-head">
-            <div>
-              <span class="eyebrow">Estadísticas</span>
-              <h2>Rendimiento por sucursal</h2>
-            </div>
-          </div>
-
-          <div id="analyticsTabs" class="analytics-tabs">
-            <button type="button" class="analytics-tab active" data-analytics="Negocio">Negocio</button>
-            <button type="button" class="analytics-tab" data-analytics="Centro">Centro</button>
-            <button type="button" class="analytics-tab" data-analytics="Ciudad de Nieva">Ciudad de Nieva</button>
-            <button type="button" class="analytics-tab" data-analytics="Alto Comedero">Alto Comedero</button>
-            <button type="button" class="analytics-tab" data-analytics="Hattogu">Hattogu</button>
-          </div>
-
-          <div class="stats-grid analytics-grid">
-            <article class="stat-card panel">
-              <span>Últimos 7 días</span>
-              <strong id="analyticsThirtyTotal">$0</strong>
-            </article>
-            <article class="stat-card panel">
-              <span>Ingresos del mes</span>
-              <strong id="analyticsMonthTotal">$0</strong>
-            </article>
-            <article class="stat-card panel">
-              <span>Promedio por día</span>
-              <strong id="analyticsDailyAverage">$0</strong>
-            </article>
-          </div>
-
-          <section class="panel chart-panel analytics-chart-wrap">
-            <div class="panel-head between analytics-header">
-              <div>
-                <span class="eyebrow">Historial</span>
-                <h2 id="analyticsChartTitle">Últimos 30 días</h2>
-              </div>
-              <div class="analytics-range-controls">
-                <div class="analytics-shortcuts">
-                  <button type="button" class="analytics-range-btn active" data-days="7">7 días</button>
-                  <button type="button" class="analytics-range-btn" data-days="14">14 días</button>
-                  <button type="button" class="analytics-range-btn" data-days="30">30 días</button>
-                  <button type="button" class="analytics-range-btn" data-days="90">90 días</button>
-                </div>
-                <div class="analytics-custom-range">
-                  <input type="date" id="analyticsFromDate">
-                  <input type="date" id="analyticsToDate">
-                  <button type="button" class="primary-btn" id="exportAnalyticsPdfBtn">Exportar PDF</button>
-                </div>
-              </div>
-            </div>
-
-            <canvas id="analyticsChart" width="900" height="280"></canvas>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head">
-              <div>
-                <span class="eyebrow">Registros</span>
-                <h2 id="analyticsTableTitle">Historial</h2>
-              </div>
-            </div>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Hora</th>
-                    <th>Sucursal</th>
-                    <th>Encargado</th>
-                    <th>Efectivo</th>
-                    <th>Transferencias / Tarjeta</th>
-                    <th>Z</th>
-                    <th>PedidosYa</th>
-                    <th>Tiraxy</th>
-                    <th>Total</th>
-                    <th>Notas</th>
-                    <th>Stock</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="analyticsRecordsTable"></tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section id="employees" class="admin-section">
-        <div class="panel employee-panel">
-          <div class="panel-head between">
-            <div>
-              <span class="eyebrow">Personal</span>
-              <h2 id="employeeFormTitle">Agregar empleado</h2>
-            </div>
-          </div>
-
-          <form id="employeeForm" class="admin-form employee-form">
-            <input type="hidden" id="employeeId">
-
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label for="employeeName">Nombre</label>
-                <input type="text" id="employeeName" required>
-              </div>
-
-              <div class="field-group">
-                <label for="employeeLastName">Apellido</label>
-                <input type="text" id="employeeLastName" required>
-              </div>
-            </div>
-
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label for="employeeRole">Rol</label>
-                <select id="employeeRole" required>
-                  <option value="Empleado">Empleado</option>
-                  <option value="Encargado">Encargado</option>
-                </select>
-              </div>
-
-              <div class="field-group">
-                <label for="employeeHourlyRate">Cobro por hora</label>
-                <input type="number" id="employeeHourlyRate" min="0" step="0.01" required>
-              </div>
-            </div>
-
-            <div class="field-group">
-              <label for="employeePhone">Número de contacto</label>
-              <input type="tel" id="employeePhone" required>
-            </div>
-
-            <div class="field-group employee-password-field hidden">
-              <label for="employeePassword">Contraseña (solo encargados)</label>
-              <input type="password" id="employeePassword" placeholder="Crear contraseña">
-            </div>
-
-            <div class="field-group employee-notes-field hidden">
-              <label for="employeeNotes">Notas del empleado</label>
-              <textarea id="employeeNotes" rows="4" placeholder="Escribí comentarios, observaciones o tareas del empleado..."></textarea>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="primary-btn">Guardar empleado</button>
-              <button type="button" id="resetEmployeeForm" class="secondary-btn">Cancelar</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="panel employee-list-panel">
-          <div class="panel-head between">
-            <div>
-              <span class="eyebrow">Listado</span>
-              <h2>Empleados registrados</h2>
-            </div>
-          </div>
-
-          <div id="employeeList" class="employee-list"></div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <div id="appModal" class="app-modal hidden" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
-      <div class="modal-header">
-        <h3 id="appModalTitle">Mensaje</h3>
-        <button type="button" class="modal-close" data-modal-close="true" aria-label="Cerrar">×</button>
+    <form id="recForm" class="form" autocomplete="off">
+      <div class="two">
+        <label>Fecha<input type="date" id="fFecha" required></label>
+        <label>Hora<input type="time" id="fHora" required></label>
       </div>
-      <div class="modal-body" id="appModalBody"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-btn" data-modal-action="cancel">Cancelar</button>
-        <button type="button" class="primary-btn" data-modal-action="confirm">Aceptar</button>
-      </div>
-    </div>
-  </div>
+      <label>Sucursal<select id="fSuc"></select></label>
+      <div class="money" id="moneyFields"></div>
+      <label>Notas del día<textarea id="fNotas" rows="3"></textarea></label>
+      <label>Stock / faltantes<textarea id="fStock" rows="3"></textarea></label>
+      <label class="check"><input type="checkbox" id="fZ"><span>No sumar a los totales (estado Z)<small>El registro se conserva y se muestra, pero queda fuera de promedios y totales.</small></span></label>
+    </form>
+    <footer>
+      <div class="tot"><span id="fTotLabel">Total del registro</span><b class="num" id="fTotal">$0</b></div>
+      <button class="btn" type="button" id="sheetCancel">Cancelar</button>
+      <button class="btn red" type="submit" form="recForm" id="sheetSave">Guardar cambios</button>
+    </footer>
+  </aside>
+  <div class="veil" id="veil"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="./admin.js"></script>
+  <div id="tip" hidden></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./ui.js"></script>
+  <script src="./dashboard.js"></script>
 </body>
 </html>

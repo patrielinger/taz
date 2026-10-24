@@ -2,135 +2,45 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TAZ · Encargado</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>TAZ Encargado</title>
   <link rel="shortcut icon" href="../img/logo-red.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./admin.css">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./panel.css">
 </head>
-<body class="admin-dashboard-page">
-  <aside class="sidebar">
-    <div class="brand-block">
-      <span class="eyebrow">TAZ</span>
-      <h2>ENCARGADO</h2>
+<body class="solo">
+  <main>
+    <div class="bar">
+      <div>
+        <h1>Cierre del día</h1>
+        <p class="hint" id="who" style="margin:4px 0 0"></p>
+      </div>
+      <button class="btn" id="logout" type="button">Salir</button>
     </div>
 
-    <nav class="sidebar-nav">
-      <button class="nav-link active" data-section="dashboard">Inicio</button>
-    </nav>
-  </aside>
-
-  <div class="dashboard-content">
-    <header class="admin-header">
-      <div class="admin-header-inner">
-        <div>
-          <span class="eyebrow">TAZ · PANEL</span>
-          <h1 id="encargadoName">Encargado</h1>
-        </div>
-        <button id="logoutBtn" type="button" class="secondary-btn">Cerrar sesión</button>
+    <form id="encForm" class="form" autocomplete="off">
+      <div class="two">
+        <label>Fecha<input type="date" id="eFecha" required></label>
+        <label>Hora<input type="time" id="eHora" required></label>
       </div>
-    </header>
+      <label>Sucursal<select id="eSuc"></select></label>
 
-    <main class="admin-shell dashboard-shell">
-      <section id="dashboard" class="admin-section active-section">
-        <section class="panel intake-panel">
-          <div class="panel-head">
-            <div>
-              <span class="eyebrow">Carga diaria</span>
-              <h2>Registrar ingresos y novedades</h2>
-            </div>
-          </div>
+      <div class="two" id="moneyFields"></div>
 
-          <form id="encForm" class="admin-form">
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label for="encDate">Fecha</label>
-                <input type="date" id="encDate" required>
-              </div>
-              <div class="field-group">
-                <label for="encTime">Hora</label>
-                <input type="time" id="encTime" required>
-              </div>
-            </div>
+      <label>Notas y novedades<textarea id="eNotas" rows="3" placeholder="Novedades del día"></textarea></label>
+      <label>Stock / faltantes<textarea id="eStock" rows="3" placeholder="Ej: Nuggets, Gaseosa 1L"></textarea></label>
 
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label for="encBranch">Sucursal</label>
-                <select id="encBranch"></select>
-              </div>
-              <div class="field-group">
-                <label>Usuario</label>
-                <div id="encUser" class="panel" style="padding:8px">—</div>
-              </div>
-            </div>
-
-            <div class="field-row payment-grid">
-              <div class="field-group">
-                <label for="encCash">Efectivo</label>
-                <input id="encCash" inputmode="numeric" pattern="[0-9]*" value="0">
-              </div>
-              <div class="field-group">
-                <label for="encTransfer">Transferencia / Transferencia</label>
-                <input id="encTransfer" inputmode="numeric" pattern="[0-9]*" value="0">
-              </div>
-              <div class="field-group">
-                <label for="encQR">Z</label>
-                <input id="encQR" inputmode="numeric" pattern="[0-9]*" value="0">
-              </div>
-              <div class="field-group">
-                <label for="encPedidosYa">PedidosYa</label>
-                <input id="encPedidosYa" inputmode="numeric" pattern="[0-9]*" value="0">
-              </div>
-              <div class="field-group" id="encTiraxyField" style="display:none;">
-                <label for="encTiraxy">Tiraxy</label>
-                <input id="encTiraxy" inputmode="numeric" pattern="[0-9]*" value="0">
-              </div>
-            </div>
-
-            <div class="field-row notes-stock-grid">
-              <div class="field-group">
-                <label for="encNotes">Notas / novedades</label>
-                <textarea id="encNotes" rows="4" placeholder="Describir novedades del día..."></textarea>
-              </div>
-
-              <div class="field-group">
-                <label for="encStock">Stock / faltantes</label>
-                <textarea id="encStock" rows="4" placeholder="Ej: Nuggets, Gaseosa 1L"></textarea>
-              </div>
-            </div>
-
-            <div class="field-row two-cols">
-              <div class="field-group">
-                <label>Total cobrado</label>
-                <div id="encTotal" class="panel" style="padding:8px">$0</div>
-              </div>
-              <div class="field-group">
-                <label>&nbsp;</label>
-                <button type="submit" class="primary-btn submit-btn">Enviar registro</button>
-              </div>
-            </div>
-          </form>
-        </section>
-      </section>
-    </main>
-  </div>
-
-  <div id="appModal" class="app-modal hidden" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
-      <div class="modal-header">
-        <h3 id="appModalTitle">Mensaje</h3>
-        <button type="button" class="modal-close" data-modal-close="true" aria-label="Cerrar">×</button>
+      <div class="bar" style="margin:6px 0 0">
+        <div><span class="hint">Total cobrado</span><br><b class="num" id="eTotal" style="font-size:34px">$0</b></div>
+        <button class="btn red" type="submit" id="send">Enviar registro</button>
       </div>
-      <div class="modal-body" id="appModalBody"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-btn" data-modal-action="cancel">Cancelar</button>
-        <button type="button" class="primary-btn" data-modal-action="confirm">Aceptar</button>
-      </div>
-    </div>
-  </div>
+    </form>
+  </main>
 
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./ui.js"></script>
   <script src="./encargado.js"></script>
 </body>
 </html>

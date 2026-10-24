@@ -407,6 +407,54 @@ async function test(name, fn) {
     cookie = saved;
   });
 
+  console.log('\nEscenario H: hora editable');
+  const dbRow = (id) => db.records.find((r) => r.id === id);
+  await test('al crear con hora, se guarda en la BD y en el JSON como HH:MM:SS', async () => {
+    const r = await api('POST', '/api/records', base({ efectivo: 301, notas: 'h-alta', hora: '08:30' }));
+    assert.strictEqual(r.status, 201);
+    assert.strictEqual(dbRow(r.json.id).hora, '08:30:00');
+    assert.strictEqual(readJson().find((x) => x.id === r.json.id).hora, '08:30:00');
+  });
+  await test('al crear sin hora, se asigna la hora actual', async () => {
+    const r = await api('POST', '/api/records', base({ efectivo: 302, notas: 'h-sin-hora' }));
+    assert.match(dbRow(r.json.id).hora, /^\d{2}:\d{2}:\d{2}$/);
+  });
+  await test('editar fecha, hora, sucursal y montos se guarda en la BD y en el JSON', async () => {
+    const c = await api('POST', '/api/records', base({ efectivo: 303, notas: 'h-edit' }));
+    const put = await api('PUT', `/api/records/${c.json.id}`, {
+      fecha: '2020-01-15', hora: '21:45', sucursal: 'Hattogu', efectivo: 1000, transferencias: 200,
+      qr: 30, pedidosYa: 4, tiraxy: 5, notas: 'h-edit', stock: ''
+    });
+    assert.strictEqual(put.status, 200);
+    assert.strictEqual(put.json.changed, true);
+    assert.strictEqual(put.json.record.hora, '21:45:00');
+    const row = dbRow(c.json.id);
+    assert.strictEqual(row.hora, '21:45:00');
+    assert.strictEqual(row.fecha, '2020-01-15');
+    assert.strictEqual(row.sucursal, 'Hattogu');
+    assert.strictEqual(Number(row.total), 1239);
+    const j = readJson().find((x) => x.id === c.json.id);
+    assert.deepStrictEqual(
+      [j.fecha, j.hora, j.sucursal, j.efectivo, j.transferencias, j.qr, j.pedidosYa, j.tiraxy, j.total],
+      ['2020-01-15', '21:45:00', 'Hattogu', 1000, 200, 30, 4, 5, 1239]
+    );
+  });
+  await test('editar sin enviar hora ni estado no los modifica', async () => {
+    const c = await api('POST', '/api/records', base({ efectivo: 304, notas: 'h-conserva', hora: '10:15', estado: 'Z' }));
+    const put = await api('PUT', `/api/records/${c.json.id}`, base({ efectivo: 305, notas: 'h-conserva' }));
+    assert.strictEqual(put.status, 200);
+    assert.strictEqual(dbRow(c.json.id).hora, '10:15:00');
+    assert.strictEqual(dbRow(c.json.id).estado, 'Z (encQR)');
+    assert.strictEqual(put.json.record.countable, false);
+  });
+  await test('una hora inválida se rechaza y no cambia nada', async () => {
+    const c = await api('POST', '/api/records', base({ efectivo: 306, notas: 'h-invalida', hora: '11:00' }));
+    const put = await api('PUT', `/api/records/${c.json.id}`, base({ efectivo: 999, notas: 'h-invalida', hora: '25:99' }));
+    assert.strictEqual(put.status, 400);
+    assert.strictEqual(dbRow(c.json.id).hora, '11:00:00');
+    assert.strictEqual(Number(dbRow(c.json.id).efectivo), 306);
+  });
+
   const failed = results.filter(([ok]) => !ok).length;
   console.log(`\n${results.length - failed}/${results.length} pruebas correctas`);
   fs.rmSync(TMP, { recursive: true, force: true });
