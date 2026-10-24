@@ -20,9 +20,50 @@ function normalizeBranchName(branch) {
   return map[value] || value;
 }
 
+function normalizeRecordDate(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return raw;
+  }
+
+  const adjusted = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return adjusted.toISOString().slice(0, 10);
+}
+
+function normalizeRecordState(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const compact = raw
+    .toUpperCase()
+    .replace(/[\s_-]+/g, '')
+    .replace(/[()]/g, '');
+
+  if (compact === 'Z' || compact === 'ZENCQR') {
+    return 'Z (encQR)';
+  }
+
+  return raw;
+}
+
 function isCountableRecord(record = {}) {
-  const state = String(record.estado ?? record.status ?? '').trim().toUpperCase();
-  return state !== 'Z';
+  const state = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '');
+  return state !== 'Z' && state !== 'Z (encQR)';
+}
+
+function getCountableRecords(records) {
+  return Array.isArray(records) ? records.filter(isCountableRecord) : [];
+}
+
+function sumRecordTotal(records) {
+  return getCountableRecords(records).reduce((sum, record) => sum + Number(record.total || 0), 0);
 }
 
 function ensureDemoData() {
@@ -66,14 +107,29 @@ function getStoredRecords() {
   if (!stored) return ensureDemoData();
 
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return ensureDemoData();
+
+    return parsed.map((record) => ({
+      ...record,
+      fecha: normalizeRecordDate(record.fecha),
+      estado: normalizeRecordState(record.estado ?? record.status ?? record.state ?? '')
+    }));
   } catch (error) {
     return ensureDemoData();
   }
 }
 
 function saveStoredRecords(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  const next = Array.isArray(records)
+    ? records.map((record) => ({
+        ...record,
+        fecha: normalizeRecordDate(record.fecha),
+        estado: normalizeRecordState(record.estado ?? record.status ?? record.state ?? '')
+      }))
+    : [];
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
 function getStoredEmployees() {
@@ -274,7 +330,7 @@ async function verifyRecordPersistedOnServer(id, payload) {
   return records.some((record) => {
     if (String(record.id) !== String(id)) return false;
 
-    const sameDate = String(record.fecha || '') === String(payload.fecha || '');
+    const sameDate = String(normalizeRecordDate(record.fecha || '')) === String(normalizeRecordDate(payload.fecha || ''));
     const sameBranch = String(record.sucursal || '') === String(payload.sucursal || '');
     const sameEfectivo = Number(record.efectivo || 0) === Number(payload.efectivo || 0);
     const sameTransferencias = Number(record.transferencias || 0) === Number(payload.transferencias || 0);
@@ -283,8 +339,9 @@ async function verifyRecordPersistedOnServer(id, payload) {
     const sameTiraxy = Number(record.tiraxy || 0) === Number(payload.tiraxy || 0);
     const sameNotas = String(record.notas || '') === String(payload.notas || '');
     const sameStock = String(record.stock || '') === String(payload.stock || '');
+    const sameState = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '') === normalizeRecordState(payload.estado ?? '');
 
-    return sameDate && sameBranch && sameEfectivo && sameTransferencias && sameQr && samePedidosYa && sameTiraxy && sameNotas && sameStock;
+    return sameDate && sameBranch && sameEfectivo && sameTransferencias && sameQr && samePedidosYa && sameTiraxy && sameNotas && sameStock && sameState;
   });
 }
 
@@ -322,7 +379,8 @@ async function persistRecordUpdate(id, payload) {
         pedidosYa: payload.pedidosYa,
         tiraxy: payload.tiraxy,
         notas: payload.notas,
-        stock: payload.stock
+        stock: payload.stock,
+        estado: payload.estado || ''
       })
     });
 
@@ -855,21 +913,10 @@ function drawChart(records) {
   }
 
   const amounts = dates.map((date) => {
-    const iso = date.toISOString().slice(0, 10);
-    return sourceRecords.filter((record) => record.fecha === iso).reduce((sum, record) => sum + Number(record.total || 0), 0);
-  });
-
-  const width = canvas.width;
-  const height = canvas.height;
-  const padding = 30;
-  const maxValue = Math.max(...amounts, 1);
-
-  ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#0b0b0b';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 1;
+      const iso = date.toISOString().slice(0, 10);
+      return getCountableRecords(sourceRecords.filter((record) => record.fecha === iso))
+        .reduce((sum, record) => sum + Number(record.total || 0), 0);
+    });
   for (let i = 0; i <= 4; i += 1) {
     const y = padding + ((height - padding * 2) / 4) * i;
     ctx.beginPath();
@@ -929,7 +976,7 @@ async function loadRecords() {
     if (Array.isArray(data)) {
       return data.map((record) => ({
         id: record.id,
-        fecha: record.fecha,
+        fecha: normalizeRecordDate(record.fecha),
         hora: record.hora || (record.created_at ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false }) : '00:00:00'),
         usuario: record.usuario,
         sucursal: record.sucursal,
@@ -1050,14 +1097,15 @@ function getAnalyticsExportRows() {
       return String(b.hora || '00:00:00').localeCompare(String(a.hora || '00:00:00'));
     });
 
-  const totalEfectivo = filteredRecords.reduce((sum, record) => sum + record.efectivo, 0);
-  const totalTransferencias = filteredRecords.reduce((sum, record) => sum + record.transferencias, 0);
-  const totalQr = filteredRecords.reduce((sum, record) => sum + record.qr, 0);
-  const totalPedidosYa = filteredRecords.reduce((sum, record) => sum + record.pedidosYa, 0);
-  const totalTiraxy = filteredRecords.reduce((sum, record) => sum + record.tiraxy, 0);
-  const totalGeneral = filteredRecords.reduce((sum, record) => sum + record.total, 0);
+  const countableFilteredRecords = getCountableRecords(filteredRecords);
+  const totalEfectivo = countableFilteredRecords.reduce((sum, record) => sum + record.efectivo, 0);
+  const totalTransferencias = countableFilteredRecords.reduce((sum, record) => sum + record.transferencias, 0);
+  const totalQr = countableFilteredRecords.reduce((sum, record) => sum + record.qr, 0);
+  const totalPedidosYa = countableFilteredRecords.reduce((sum, record) => sum + record.pedidosYa, 0);
+  const totalTiraxy = countableFilteredRecords.reduce((sum, record) => sum + record.tiraxy, 0);
+  const totalGeneral = countableFilteredRecords.reduce((sum, record) => sum + record.total, 0);
   const daysCount = Math.max(1, Math.round((end - start) / 86400000) + 1);
-  const recordCount = filteredRecords.length;
+  const recordCount = countableFilteredRecords.length;
 
   return {
     scope: analyticsScope,
@@ -1310,7 +1358,7 @@ async function renderAnalytics() {
 
   const values = days.map((date) => {
     const iso = formatDateInput(date);
-    return source.filter((record) => record.fecha === iso).reduce((sum, item) => sum + Number(item.total || 0), 0);
+    return sumRecordTotal(source.filter((record) => record.fecha === iso));
   });
 
   const width = canvas.width;

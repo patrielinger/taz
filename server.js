@@ -531,6 +531,39 @@ async function initDatabase() {
 
 let pool;
 
+function normalizeRecordDate(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return raw;
+  }
+
+  const adjusted = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return adjusted.toISOString().slice(0, 10);
+}
+
+function normalizeRecordState(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const compact = raw
+    .toUpperCase()
+    .replace(/[\s_-]+/g, '')
+    .replace(/[()]/g, '');
+
+  if (compact === 'Z' || compact === 'ZENCQR') {
+    return 'Z (encQR)';
+  }
+
+  return raw;
+}
+
 function getRecordTotal(record = {}) {
   return Number(
     record.total ?? (
@@ -544,14 +577,14 @@ function getRecordTotal(record = {}) {
 }
 
 function isCountableRecord(record = {}) {
-  const rawState = String(record.estado ?? record.status ?? '').trim().toUpperCase();
-  return rawState !== 'Z';
+  const state = normalizeRecordState(record.estado ?? record.status ?? record.state ?? '');
+  return state !== 'Z' && state !== 'Z (encQR)';
 }
 
 function normalizeRecordRow(record = {}) {
   return {
     id: record.id ?? record.record_id ?? record.recordId,
-    fecha: record.fecha || '',
+    fecha: normalizeRecordDate(record.fecha || ''),
     hora: record.hora || (
       record.created_at
         ? new Date(record.created_at).toLocaleTimeString('es-AR', { hour12: false })
@@ -568,7 +601,7 @@ function normalizeRecordRow(record = {}) {
     stock: record.stock || '',
     total: getRecordTotal(record),
     created_at: record.created_at || new Date().toISOString(),
-    estado: record.estado || record.status || ''
+    estado: normalizeRecordState(record.estado ?? record.status ?? record.state ?? '')
   };
 }
 
@@ -578,21 +611,7 @@ async function syncRecordsJsonFromDatabase() {
   }
 
   const [rows] = await pool.execute(`
-    SELECT
-      id,
-      fecha,
-      sucursal,
-      efectivo,
-      transferencias,
-      qr,
-      pedidos_ya AS pedidosYa,
-      tiraxy,
-      total,
-      notas,
-      stock,
-      usuario,
-      created_at,
-      NULL AS estado
+    SELECT *
     FROM records
     ORDER BY fecha DESC, created_at DESC, id DESC
   `);
@@ -1041,21 +1060,7 @@ app.get(
 
     try {
       const [rows] = await pool.execute(`
-        SELECT
-          id,
-          fecha,
-          sucursal,
-          efectivo,
-          transferencias,
-          qr,
-          pedidos_ya AS pedidosYa,
-          tiraxy,
-          total,
-          notas,
-          stock,
-          usuario,
-          created_at,
-          NULL AS estado
+        SELECT *
         FROM records
         ORDER BY fecha DESC, created_at DESC, id DESC
       `);

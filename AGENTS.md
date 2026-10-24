@@ -37,6 +37,14 @@ npm run dev
 - File uploads are stored under [uploads/](uploads/) and also recorded in MySQL via the `uploaded_files` table; do not create noisy writes in watched folders.
 - The root pages are mostly static HTML/JS while admin flows are under [9f4a7b2c/](9f4a7b2c/). Keep UI logic close to the page it serves instead of mixing unrelated features together.
 
+## AI agent workflow
+
+- Use the repo's Docker-first startup flow unless a requirement explicitly calls for a local-only run; the app expects MySQL to be on the network at startup.
+- Keep backend logic in [server.js](server.js) and page-specific behavior next to the relevant admin/public asset; avoid scattering feature logic across unrelated files.
+- If a data change touches persisted records, always keep both MySQL and the JSON fallback in sync. Missing one side causes subtle drift and broken local reads.
+- For auth, session, or employee login changes, validate the browser flow with `credentials: 'include'` and the real session cookie behavior instead of only checking backend code.
+- Prefer small, isolated edits. LocalNode runtime may not exist in every environment, so rely on repo scripts and Docker to validate changes instead of assuming a direct Node install.
+
 ## Common pitfalls
 
 - `nodemon` watches [data/](data/) and [uploads/](uploads/). Writing files there during development can trigger restart loops; keep writes minimal and respect the existing ignore config in [nodemon.json](nodemon.json).
